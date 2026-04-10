@@ -1,0 +1,138 @@
+"""
+Configuración global del proyecto: dimensiones, tiempos, límites y rutas.
+Centralizar constantes aquí facilita experimentos y la defensa académica del sistema.
+"""
+
+from pathlib import Path
+
+# --- Rutas del proyecto ---
+RAIZ_PROYECTO = Path(__file__).resolve().parent
+CARPETA_ASSETS = RAIZ_PROYECTO / "assets"
+CARPETA_CARROS = CARPETA_ASSETS / "carros"
+CARPETA_SEMAFOROS = CARPETA_ASSETS / "semaforos"
+CARPETA_FONDOS = CARPETA_ASSETS / "fondos"
+# Salida de gráficas Matplotlib (evolución GA, comparaciones, etc.).
+CARPETA_GRAFICAS = RAIZ_PROYECTO / "graficas"
+
+
+def asegurar_carpeta_graficas() -> None:
+    """Crea la carpeta de gráficas si no existe."""
+    CARPETA_GRAFICAS.mkdir(parents=True, exist_ok=True)
+
+
+# --- Ventana Pygame (simulación visual) ---
+ANCHO_VENTANA = 900
+ALTO_VENTANA = 650
+# Mitad del ancho de calle (px), debe coincidir con entorno.dibujar (ancho_calle / 2).
+MITAD_ANCHO_VIA = 55.0
+# Carril recto vs giro dentro del mismo sentido: separación entre sus ejes (px).
+SEPARACION_CARRILES_MISMO_SENTIDO = 18.0
+# Distancia desde el centro del cruce al punto medio entre esos dos carriles (px), dentro de la mitad de vía.
+OFFSET_CENTRO_GRUPO_CARRIL = 28.0
+FPS = 60
+TITULO_VENTANA = "Proyecto Semáforo IA — Simulación"
+
+# --- Colores RGB (útiles para Pygame y gráficas) ---
+COLOR_FONDO = (32, 36, 48)
+COLOR_CALLE = (48, 52, 62)
+COLOR_CENTRO = (40, 44, 54)
+COLOR_CARRO_NS = (220, 90, 90)
+COLOR_CARRO_EW = (90, 140, 220)
+COLOR_TEXTO = (230, 230, 235)
+COLOR_SEMAFORO_ROJO = (200, 50, 50)
+COLOR_SEMAFORO_AMARILLO = (220, 200, 60)
+COLOR_SEMAFORO_VERDE = (80, 200, 100)
+
+# --- Intersección y tráfico ---
+# Capacidad de referencia para normalizar "densidad" (vehículos presentes / este valor).
+CAPACIDAD_REFERENCIA_VEHICULOS = 24
+# Máximo de vehículos que pueden existir a la vez en la simulación simple.
+MAX_VEHICULOS_EN_MAPA = 30
+# Intervalo aproximado entre apariciones de vehículos (segundos), se usa jitter aleatorio.
+INTERVALO_SPAWN_BASE = 1.8
+# Velocidad base de movimiento (píxeles por segundo) en calle libre.
+VELOCIDAD_BASE = 85.0
+# Hueco extra entre centros de vehículos en cola (además de radios), para evitar solapamiento visual.
+GAP_VISUAL_ENTRE_VEHICULOS = 8.0
+# Referencia ~ mitad del ancho del cruce dibujado; sirve para colocar la línea de parada (no es el punto de desaparición).
+DISTANCIA_SALIDA_CRUCE = 52.0
+# Distancia desde el centro hasta la línea de parada (píxeles en el eje de marcha). Debe ser mayor que la mitad
+# del cuadro central en la vista (entorno.dibujar usa ancho_calle=110 → mitad 55); si es menor, el coche frena
+# dentro del recuadro oscuro del cruce.
+DISTANCIA_PARADA_ANTE_SEMAFORO = float(DISTANCIA_SALIDA_CRUCE) + 16.0
+# Mismo margen que el spawn: el coche se retira al llegar al borde opuesto y se ve todo el tramo de salida.
+MARGEN_BORDE_VEHICULO = 120.0
+
+# --- Fase 2: giros, tipos, carriles, fase adaptativa, GA multi-escenario ---
+USA_FASE_ADAPTATIVA = True
+UMBRAL_INICIO_GIRO_CRUCE = 44.0
+PROB_MANIOBRA_RECTO = 0.58
+PROB_MANIOBRA_IZQUIERDA = 0.21
+PROB_MANIOBRA_DERECHA = 0.21
+PESOS_SPAWN_TIPO_VEHICULO = (0.18, 0.52, 0.15, 0.15)
+ESCENARIOS_ENTRENAMIENTO_GA = ("bajo", "pico", "desbalanceado", "mixto")
+PESOS_ENTRENAMIENTO_MULTI_ESCENARIO = (0.25, 0.25, 0.25, 0.25)
+USA_ENTRENAMIENTO_MULTI_ESCENARIO = True
+ARCHIVO_BANCO_CROMOSOMAS = RAIZ_PROYECTO / "banco_cromosomas.json"
+# Radio (px) alrededor del centro: dentro se aplica tope de velocidad por factor_despeje (cruce ocupado más tiempo).
+RADIO_ZONA_CRUCE_INTERIOR = 58.0
+
+# --- Semáforo (tiempos en segundos) ---
+DURACION_AMARILLO = 3.0
+VERDE_MIN = 8
+VERDE_MAX = 55
+# Ciclo de referencia para modo tiempo fijo (segundos de verde por fase).
+VERDE_FIJO_NS = 22
+VERDE_FIJO_EW = 22
+
+# --- Universos difusos (rangos numéricos reales antes de normalizar) ---
+ESPERA_MAX_UNIVERSO = 90.0  # segundos
+COLA_MAX_UNIVERSO = 20.0  # vehículos en la aproximación más cargada
+
+# --- Algoritmo genético ---
+POBLACION_GA = 24
+GENERACIONES_GA = 18
+PROB_CRUCE = 0.75
+PROB_MUTACION = 0.12
+ELITISMO = 2
+SEMILLA_ALEATORIA = 42
+
+# Duración de cada evaluación de fitness (segundos de simulación acelerada).
+DURACION_EVALUACION_FITNESS = 120.0
+# En entrenamiento sin ventana, pasos de simulación más largos por tick interno.
+DT_SIMULACION_RAPIDA = 0.25
+
+# Pesos de la función fitness compuesta (minimizar espera y cola; maximizar atendidos).
+PESO_TIEMPO_ESPERA = 0.5
+PESO_LONGITUD_COLA = 0.3
+PESO_VEHICULOS_ATENDIDOS = 0.2
+
+# Archivo donde se guarda el mejor cromosoma tras entrenar.
+ARCHIVO_MEJOR_CROMOSOMA = RAIZ_PROYECTO / "mejor_cromosoma.json"
+
+# --- Escenarios de tráfico (solo generación; no afecta difuso/GA) ---
+ESCENARIO_POR_DEFECTO = "bajo"
+# Duración de referencia para escalar el escenario mixto (plantilla 0–120 s).
+DURACION_REFERENCIA_MIXTO = 120.0
+# En modo visual sin límite de tiempo, escala mixto con esta duración (segundos).
+DURACION_PLAN_VISUAL_MIXTO = 900.0
+
+# --- Comparación y gráficas ---
+SEED_COMPARACION = 7
+DURACION_ESCENARIO_COMPARACION = 180.0
+# Duración por defecto para `comparar` (promedios multisemilla).
+DURACION_COMPARAR_DIFUSO_GA = 120.0
+# Semillas para `comparar` (promedio por estrategia).
+SEEDS_COMPARACION_MULTISEMILLA = [1, 7, 15, 23, 42]
+# Entrenamiento GA: perfil de tráfico fijo durante evaluación de fitness.
+ESCENARIO_ENTRENAMIENTO_GA = "bajo"
+
+# Salida de gráficas de evaluación (dentro de CARPETA_GRAFICAS).
+ARCHIVO_GRAFICA_EVOLUCION_FITNESS = CARPETA_GRAFICAS / "evolucion_fitness.png"
+ARCHIVO_GRAFICA_COMPARACION_COSTES = CARPETA_GRAFICAS / "comparacion_costes.png"
+ARCHIVO_GRAFICA_COMPARAR_GA = CARPETA_GRAFICAS / "comparacion_sin_ga_vs_ga.png"
+ARCHIVO_GRAFICA_ESTRATEGIAS_PROMEDIO = CARPETA_GRAFICAS / "comparacion_estrategias_promedio.png"
+ARCHIVO_GRAFICA_POR_ESCENARIO = CARPETA_GRAFICAS / "comparacion_por_escenario.png"
+
+# Escenario usado en `comparar_completo` (una semilla, coste compuesto; retrocompatibilidad).
+ESCENARIO_COMPARAR_COMPLETO = "bajo"

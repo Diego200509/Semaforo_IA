@@ -1,0 +1,64 @@
+# --- Entorno virtual ---
+venv/
+.venv/
+env/
+
+# --- Bytecode / caché Python ---
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.egg
+*.egg-info/
+.eggs/
+pip-wheel-metadata/
+
+# --- Herramientas de test / tipos ---
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.hypothesis/
+htmlcov/
+.coverage
+.coverage.*
+coverage.xml
+*.cover
+
+# --- Build / empaquetado ---
+dist/
+build/
+*.manifest
+*.spec
+
+# --- Variables de entorno y secretos ---
+.env
+.env.*
+!.env.example
+
+# --- IDEs y editores ---
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# --- Cursor (opcional: quita esta línea si quieres versionar reglas del proyecto) ---
+.cursor/
+
+# --- Sistema operativo ---
+.DS_Store
+Thumbs.db
+Desktop.ini
+ehthumbs.db
+
+# --- Jupyter ---
+.ipynb_checkpoints/
+
+# --- Salida de gráficas (Matplotlib); se mantiene la carpeta con .gitkeep ---
+graficas/*
+!graficas/.gitkeep
+
+# --- Resultados de entrenamiento GA ---
+mejor_cromosoma.json
+banco_cromosomas.json

@@ -47,9 +47,18 @@ class ControladorDifuso:
     def _normalizar_entradas(self, estado: Mapping[str, float]) -> tuple[float, float, float]:
         dens_raw = estado.get("densidad_ponderada", estado.get("densidad_vehicular", 0.0))
         dens = float(np.clip(float(dens_raw), 0.0, 1.0))
-        esp = float(estado.get("tiempo_espera_promedio", 0.0))
+        # Si el motor envía `inferir_para_grupo_ns`, cola y espera del eje que recibe el verde.
+        eje = estado.get("inferir_para_grupo_ns", None)
+        if eje is True:
+            cola = float(estado.get("cola_ns", 0.0))
+            esp = float(estado.get("espera_ns", estado.get("tiempo_espera_promedio", 0.0)))
+        elif eje is False:
+            cola = float(estado.get("cola_ew", 0.0))
+            esp = float(estado.get("espera_ew", estado.get("tiempo_espera_promedio", 0.0)))
+        else:
+            esp = float(estado.get("tiempo_espera_promedio", 0.0))
+            cola = float(estado.get("longitud_cola", 0.0))
         esp_n = float(np.clip(esp / max(1e-6, config.ESPERA_MAX_UNIVERSO), 0.0, 1.0))
-        cola = float(estado.get("longitud_cola", 0.0))
         cola_n = float(np.clip(cola / max(1e-6, config.COLA_MAX_UNIVERSO), 0.0, 1.0))
         return dens, esp_n, cola_n
 
@@ -68,6 +77,10 @@ class ControladorDifuso:
     def inferir_tiempo_verde(self, estado: Mapping[str, float]) -> float:
         """
         Retorna segundos de luz verde en [VERDE_MIN, VERDE_MAX].
+
+        Si `estado` incluye la clave booleana `inferir_para_grupo_ns` (inyectada por el motor
+        al iniciar cada verde), las entradas **espera** y **cola** del difuso corresponden a ese
+        eje; si falta, se usa el comportamiento previo (espera global y max(colas)).
         """
         d, e, c = self._normalizar_entradas(estado)
         g_d = self._grados_por_variable(d, self._u_d, self._mf_d)

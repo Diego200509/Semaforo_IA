@@ -127,7 +127,8 @@ class MotorSimulacionProgramatico(MotorSimulacion):
             return
         if self._fase_en_que_se_fijo_verde == sem.fase:
             return
-        estado = self.obtener_estado_trafico()
+        estado = dict(self.obtener_estado_trafico())
+        estado["inferir_para_grupo_ns"] = sem.fase == FaseSemaforo.VERDE_NS
         try:
             t = float(self._callback(estado))
         except Exception:

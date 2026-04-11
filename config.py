@@ -93,9 +93,9 @@ INTERVALO_SPAWN_BASE = 1.8
 # Velocidad base de movimiento (píxeles por segundo) en calle libre.
 VELOCIDAD_BASE = 85.0
 # Hueco extra entre centros de vehículos en cola (además de radios); más bajo = cola más junta.
-GAP_VISUAL_ENTRE_VEHICULOS = 2.5
+GAP_VISUAL_ENTRE_VEHICULOS = 3.0
 # Suma mínima en px además de los radios (separación entre centros); bajar acerca más los coches en cola.
-SEPARACION_BASE_CENTROS_PX = 4.0
+SEPARACION_BASE_CENTROS_PX = 5.0
 # Misma fila lógica aunque el guiado lateral aún no los haya alineado del todo (< separación recto/giro ~18 px).
 TOLERANCIA_MISMO_CORREDOR_PX = 16.0
 # 0–1: corrección de separación en cola por fotograma (más alto = cierra huecos antes).

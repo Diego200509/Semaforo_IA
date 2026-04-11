@@ -649,7 +649,7 @@ class Interseccion:
             suma_peso / max(1e-6, float(config.CAPACIDAD_REFERENCIA_VEHICULOS)),
         )
 
-        cola_ns, cola_ew, _, _ = self._esperas_y_colas_por_eje(activos)
+        cola_ns, cola_ew, espera_ns, espera_ew = self._esperas_y_colas_por_eje(activos)
         longitud_cola = float(max(cola_ns, cola_ew))
 
         esperas = [v.tiempo_espera for v in activos if v.detenido or v.velocidad < 15]
@@ -662,6 +662,8 @@ class Interseccion:
             "longitud_cola": longitud_cola,
             "cola_ns": float(cola_ns),
             "cola_ew": float(cola_ew),
+            "espera_ns": float(espera_ns),
+            "espera_ew": float(espera_ew),
             "fase": self.semaforo.fase,
             "vehiculos_en_mapa": n,
             "ultimo_verde_fue_ns": bool(self.semaforo.ultimo_verde_fue_ns),

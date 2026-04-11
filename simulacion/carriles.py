@@ -1,11 +1,9 @@
 """
 Varios carriles por aproximación (Fase 2).
 
-Por cada sentido hay dos carriles lógicos (recto y giro), ambos en la **misma mitad**
-de la vía respecto al eje central, para no mezclar trayectorias con el sentido opuesto.
-
-Carril 0: recto (carril exterior, más alejado del eje central).
-Carril 1: giro (carril interior, más cercano al eje central).
+Por sentido hay dos ejes paralelos en la **misma mitad** de la vía (respecto al sentido
+contrario). Con circulación solo recta son dos columnas; con giros, 0 = recto (exterior)
+y 1 = giro (interior).
 """
 
 from __future__ import annotations

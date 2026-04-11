@@ -342,6 +342,115 @@ class MotorSimulacionPygame(MotorSimulacionProgramatico):
         self._sprites_rotados_cache[clave] = rot
         return rot
 
+    def _linea_vertical_discontinua(
+        self,
+        x: int,
+        y0: int,
+        y1: int,
+        color: tuple,
+        grosor: int = 1,
+        dash_px: int | None = None,
+        gap_px: int | None = None,
+    ) -> None:
+        pg = self._pg
+        surf = self._pantalla
+        dash = max(
+            3,
+            int(
+                dash_px
+                if dash_px is not None
+                else getattr(config, "MARCAS_VIALES_DASH_PX", 10)
+            ),
+        )
+        gap = max(
+            2,
+            int(
+                gap_px
+                if gap_px is not None
+                else getattr(config, "MARCAS_VIALES_GAP_PX", 7)
+            ),
+        )
+        ya, yb = (y0, y1) if y0 <= y1 else (y1, y0)
+        y = float(ya)
+        while y <= yb:
+            y_end = min(y + float(dash), float(yb))
+            if y_end > y:
+                pg.draw.line(surf, color, (int(x), int(y)), (int(x), int(y_end)), grosor)
+            y = y_end + float(gap)
+
+    def _linea_horizontal_discontinua(
+        self,
+        y: int,
+        x0: int,
+        x1: int,
+        color: tuple,
+        grosor: int = 1,
+        dash_px: int | None = None,
+        gap_px: int | None = None,
+    ) -> None:
+        pg = self._pg
+        surf = self._pantalla
+        dash = max(
+            3,
+            int(
+                dash_px
+                if dash_px is not None
+                else getattr(config, "MARCAS_VIALES_DASH_PX", 10)
+            ),
+        )
+        gap = max(
+            2,
+            int(
+                gap_px
+                if gap_px is not None
+                else getattr(config, "MARCAS_VIALES_GAP_PX", 7)
+            ),
+        )
+        xa, xb = (x0, x1) if x0 <= x1 else (x1, x0)
+        x = float(xa)
+        while x <= xb:
+            x_end = min(x + float(dash), float(xb))
+            if x_end > x:
+                pg.draw.line(surf, color, (int(x), int(y)), (int(x_end), int(y)), grosor)
+            x = x_end + float(gap)
+
+    def _dibujar_marcas_viales(self, cx: int, cy: int, ancho_calle: int) -> None:
+        """Paralelas (suaves) y eje fuera del cruce + marco blanco del cuadrado central."""
+        pg = self._pg
+        surf = self._pantalla
+        color_eje = tuple(getattr(config, "COLOR_MARCA_VIAL", (248, 248, 252)))
+        color_par = tuple(getattr(config, "COLOR_MARCA_VIAL_PARALELA", (198, 200, 210)))
+        largo = max(config.ANCHO_VENTANA, config.ALTO_VENTANA)
+        mid = int(round(float(getattr(config, "OFFSET_CENTRO_GRUPO_CARRIL", 28.0))))
+        h = ancho_calle // 2
+        y_lo = cy - h
+        y_hi = cy + h
+        x_lo = cx - h
+        x_hi = cx + h
+
+        def v_doble(xv: int, g: int, col: tuple) -> None:
+            if y_lo > 0:
+                self._linea_vertical_discontinua(xv, 0, y_lo, col, g)
+            if y_hi < largo:
+                self._linea_vertical_discontinua(xv, y_hi, largo - 1, col, g)
+
+        def h_doble(yv: int, g: int, col: tuple) -> None:
+            if x_lo > 0:
+                self._linea_horizontal_discontinua(yv, 0, x_lo, col, g)
+            if x_hi < largo:
+                self._linea_horizontal_discontinua(yv, x_hi, largo - 1, col, g)
+
+        # Ejes (sentido opuesto) y carriles paralelos: tramos fuera del cuadro del cruce.
+        v_doble(cx, 2, color_eje)
+        v_doble(cx - mid, 1, color_par)
+        v_doble(cx + mid, 1, color_par)
+        h_doble(cy, 2, color_eje)
+        h_doble(cy - mid, 1, color_par)
+        h_doble(cy + mid, 1, color_par)
+
+        marco = max(1, int(getattr(config, "CRUCE_MARCO_GROSOR_PX", 3)))
+        pg.draw.rect(surf, color_eje, (x_lo, y_lo, ancho_calle, ancho_calle), width=marco)
+
     def cerrar(self) -> None:
         self._pg.quit()
 
@@ -354,7 +463,7 @@ class MotorSimulacionPygame(MotorSimulacionProgramatico):
             self._pantalla.fill(config.COLOR_FONDO)
 
         cx, cy = self.interseccion.centro_x, self.interseccion.centro_y
-        ancho_calle = 110
+        ancho_calle = int(round(2.0 * float(getattr(config, "MITAD_ANCHO_VIA", 55.0))))
         largo = max(config.ANCHO_VENTANA, config.ALTO_VENTANA)
 
         pg.draw.rect(
@@ -372,6 +481,8 @@ class MotorSimulacionPygame(MotorSimulacionProgramatico):
             config.COLOR_CENTRO,
             (cx - ancho_calle // 2, cy - ancho_calle // 2, ancho_calle, ancho_calle),
         )
+
+        self._dibujar_marcas_viales(cx, cy, ancho_calle)
 
         self._dibujar_semaforos(cx, cy)
         self._asegurar_sprites_base_por_tipo()

@@ -65,6 +65,14 @@ HUD_METRICAS_NOMBRES_FUENTE = (
 COLOR_FONDO = (32, 36, 48)
 COLOR_CALLE = (48, 52, 62)
 COLOR_CENTRO = (40, 44, 54)
+# Marcas viales dibujadas en Pygame (alineadas a OFFSET_CENTRO_GRUPO_CARRIL / MITAD_ANCHO_VIA).
+COLOR_MARCA_VIAL = (248, 248, 252)
+# Líneas al hilo (paralelas al sentido), algo más suaves que el eje central.
+COLOR_MARCA_VIAL_PARALELA = (198, 200, 210)
+MARCAS_VIALES_DASH_PX = 10
+MARCAS_VIALES_GAP_PX = 7
+# Contorno continuo del cuadro del cruce (Pygame); grosor del rectángulo blanco.
+CRUCE_MARCO_GROSOR_PX = 3
 COLOR_CARRO_NS = (220, 90, 90)
 COLOR_CARRO_EW = (90, 140, 220)
 COLOR_TEXTO = (230, 230, 235)
@@ -100,8 +108,10 @@ DISTANCIA_SALIDA_CRUCE = 52.0
 # del cuadro central en la vista (entorno.dibujar usa ancho_calle=110 → mitad 55); si es menor, el coche frena
 # dentro del recuadro oscuro del cruce.
 DISTANCIA_PARADA_ANTE_SEMAFORO = float(DISTANCIA_SALIDA_CRUCE) + 16.0
-# Distancia del borde de la ventana donde aparecen los vehículos (spawn).
+# Reservado (p. ej. HUD); el spawn usa MARGEN_SPAWN_VENTANA.
 MARGEN_BORDE_VEHICULO = 120.0
+# Centro del vehículo a esta distancia del borde de la ventana al aparecer (inicio visual del carril).
+MARGEN_SPAWN_VENTANA = 18.0
 # Distancia del borde (desde el centro del vehículo) para retirarlo del mapa. Menor = casi al borde visible.
 MARGEN_RETIRO_VENTANA = 28.0
 

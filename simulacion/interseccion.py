@@ -10,7 +10,12 @@ import random
 from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple
 
 import config
-from simulacion.carriles import CARRIL_PRINCIPAL_RECTO, carril_para_maniobra, offset_spawn_lateral
+from simulacion.carriles import (
+    CARRIL_PRINCIPAL_RECTO,
+    carril_para_maniobra,
+    elegir_carril_aleatorio,
+    offset_spawn_lateral,
+)
 from simulacion.politica_fase import siguiente_grupo_es_ns
 from simulacion.semaforo import FaseSemaforo, Semaforo
 from simulacion.tipos_trafico import TipoVehiculo, especificacion
@@ -270,10 +275,13 @@ class Interseccion:
         if len(self.vehiculos) >= config.MAX_VEHICULOS_EN_MAPA:
             return
         dire = self._rng.choices(self._dirs_spawn, weights=self._pesos_spawn, k=1)[0]
-        margen = int(config.MARGEN_BORDE_VEHICULO)
+        margen = max(
+            6,
+            int(round(float(getattr(config, "MARGEN_SPAWN_VENTANA", 18.0)))),
+        )
         if _vehiculos_solo_recto():
             maniobra = Maniobra.RECTO
-            carril = CARRIL_PRINCIPAL_RECTO
+            carril = elegir_carril_aleatorio(self._rng)
         else:
             maniobra = self._elegir_maniobra_spawn()
             carril = carril_para_maniobra(maniobra)

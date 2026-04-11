@@ -69,8 +69,10 @@ class Interseccion:
         self.tiempo_simulado = 0.0
 
         self.max_tiempo_espera_observado = 0.0
+        self.max_longitud_cola_observada = 0.0
         self.suma_vehiculos_detenidos_muestras = 0.0
         self.muestras_detenidos = 0
+        self.suma_demora_vehiculos_atendidos = 0.0
 
         self._intervalo_spawn = float(config.INTERVALO_SPAWN_BASE)
         self._mitad_via = float(getattr(config, "MITAD_ANCHO_VIA", 55.0))
@@ -108,8 +110,10 @@ class Interseccion:
         self.vehiculos_atendidos = 0
         self.tiempo_simulado = 0.0
         self.max_tiempo_espera_observado = 0.0
+        self.max_longitud_cola_observada = 0.0
         self.suma_vehiculos_detenidos_muestras = 0.0
         self.muestras_detenidos = 0
+        self.suma_demora_vehiculos_atendidos = 0.0
         self._historial_segmentos = []
         self._seg_etiqueta = ""
         self._seg_t0 = 0.0
@@ -601,6 +605,8 @@ class Interseccion:
                 v.cruzo = True
                 self.vehiculos_atendidos += 1
                 self._seg_atendidos += 1
+                # Conserva la demora real por vehículo atendido para castigar esperas largas aisladas.
+                self.suma_demora_vehiculos_atendidos += float(v.tiempo_espera)
                 continue
 
             delante = self._vehiculo_delante_misma_aproximacion(v)
@@ -664,6 +670,11 @@ class Interseccion:
         self.muestras_espera += 1
         self.suma_longitud_cola_muestras += estado["longitud_cola"]
         self.muestras_cola += 1
+        # La cola máxima complementa el promedio y ayuda a detectar picos de congestión.
+        self.max_longitud_cola_observada = max(
+            self.max_longitud_cola_observada,
+            float(estado["longitud_cola"]),
+        )
 
         activos = [v for v in self.vehiculos if not v.cruzo]
         if activos:
@@ -737,13 +748,21 @@ class Interseccion:
         )
         t_sim = max(1e-9, self.tiempo_simulado)
         throughput = float(self.vehiculos_atendidos) / t_sim
+        demora_promedio = (
+            self.suma_demora_vehiculos_atendidos / self.vehiculos_atendidos
+            if self.vehiculos_atendidos
+            else 0.0
+        )
         m = {
             "tiempo_espera_promedio_muestras": prom_espera,
             "longitud_cola_promedio_muestras": prom_cola,
             "vehiculos_atendidos": float(self.vehiculos_atendidos),
             "tiempo_simulado": self.tiempo_simulado,
             "tiempo_espera_maximo": float(self.max_tiempo_espera_observado),
+            "longitud_cola_maxima": float(self.max_longitud_cola_observada),
             "vehiculos_detenidos_promedio_muestras": prom_det,
+            "demora_total_vehiculos_atendidos": float(self.suma_demora_vehiculos_atendidos),
+            "demora_promedio_por_vehiculo": float(demora_promedio),
             "throughput": throughput,
         }
         if self._historial_segmentos:

@@ -226,6 +226,10 @@ DT_SIMULACION_RAPIDA = 0.25
 PESO_TIEMPO_ESPERA = 0.5
 PESO_LONGITUD_COLA = 0.3
 PESO_VEHICULOS_ATENDIDOS = 0.2
+# Penalizaciones suaves para evitar soluciones buenas "en promedio" pero injustas.
+PESO_TIEMPO_ESPERA_MAXIMA = 0.18
+PESO_COLA_MAXIMA = 0.10
+PESO_DEMORA_PROMEDIO_POR_VEHICULO = 0.12
 
 # Archivo donde se guarda el mejor cromosoma tras entrenar.
 ARCHIVO_MEJOR_CROMOSOMA = obtener_perfil_entrenamiento("final").archivo_mejor_cromosoma

@@ -18,27 +18,44 @@ from genetico.cromosoma import Cromosoma
 from simulacion.entorno import MotorSimulacionProgramatico
 
 
-def _normalizar_metricas(metricas: dict) -> tuple[float, float, float]:
+def _normalizar_metricas(metricas: dict) -> dict[str, float]:
     """Lleva magnitudes a escala comparable ~[0, 1]."""
     espera = float(metricas.get("tiempo_espera_promedio_muestras", 0.0))
     cola = float(metricas.get("longitud_cola_promedio_muestras", 0.0))
+    espera_max = float(metricas.get("tiempo_espera_maximo", 0.0))
+    cola_max = float(metricas.get("longitud_cola_maxima", 0.0))
+    demora_promedio = float(metricas.get("demora_promedio_por_vehiculo", 0.0))
     atendidos = float(metricas.get("vehiculos_atendidos", 0.0))
 
     esp_n = min(1.0, espera / max(1e-6, config.ESPERA_MAX_UNIVERSO))
     cola_n = min(1.0, cola / max(1e-6, config.COLA_MAX_UNIVERSO))
+    # Los extremos se normalizan aparte para que el GA no esconda hambre de verde en los promedios.
+    espera_max_n = min(1.0, espera_max / max(1e-6, config.ESPERA_MAX_UNIVERSO))
+    cola_max_n = min(1.0, cola_max / max(1e-6, config.COLA_MAX_UNIVERSO))
+    demora_promedio_n = min(1.0, demora_promedio / max(1e-6, config.ESPERA_MAX_UNIVERSO))
     t_sim = max(1e-6, float(metricas.get("tiempo_simulado", 1.0)))
     ritmo = atendidos / t_sim
     atend_n = min(1.0, ritmo / 1.2)
-    return esp_n, cola_n, atend_n
+    return {
+        "espera_promedio": esp_n,
+        "cola_promedio": cola_n,
+        "espera_maxima": espera_max_n,
+        "cola_maxima": cola_max_n,
+        "demora_promedio_por_vehiculo": demora_promedio_n,
+        "throughput": atend_n,
+    }
 
 
 def coste_desde_metricas(metricas: dict) -> float:
     """Menor es mejor."""
-    esp_n, cola_n, atend_n = _normalizar_metricas(metricas)
+    normalizadas = _normalizar_metricas(metricas)
     return (
-        config.PESO_TIEMPO_ESPERA * esp_n
-        + config.PESO_LONGITUD_COLA * cola_n
-        - config.PESO_VEHICULOS_ATENDIDOS * atend_n
+        config.PESO_TIEMPO_ESPERA * normalizadas["espera_promedio"]
+        + config.PESO_LONGITUD_COLA * normalizadas["cola_promedio"]
+        + config.PESO_TIEMPO_ESPERA_MAXIMA * normalizadas["espera_maxima"]
+        + config.PESO_COLA_MAXIMA * normalizadas["cola_maxima"]
+        + config.PESO_DEMORA_PROMEDIO_POR_VEHICULO * normalizadas["demora_promedio_por_vehiculo"]
+        - config.PESO_VEHICULOS_ATENDIDOS * normalizadas["throughput"]
     )
 
 

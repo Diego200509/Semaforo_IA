@@ -62,3 +62,7 @@ graficas/*
 # --- Resultados de entrenamiento GA ---
 mejor_cromosoma.json
 banco_cromosomas.json
+cromosoma_prueba.json
+cromosoma_final.json
+banco_prueba.json
+banco_final.json

@@ -73,13 +73,19 @@ def _evaluar_poblacion_generacion(
     *,
     generacion: int,
     semilla_base: int,
+    perfil_entrenamiento: str,
     escenario_fitness: str | None,
     multi_escenario: bool | None,
 ) -> None:
     """
     Evalúa solo individuos inválidos usando el mismo bloque de semillas compartidas.
     """
-    semillas = _semillas_compartidas_generacion(semilla_base, generacion)
+    perfil_cfg = config.obtener_perfil_entrenamiento(perfil_entrenamiento)
+    semillas = _semillas_compartidas_generacion(
+        semilla_base,
+        generacion,
+        cantidad=perfil_cfg.semillas_compartidas_por_generacion,
+    )
     invalidos = [ind for ind in poblacion if not ind.fitness.valid]
     for individual in invalidos:
         crom = Cromosoma([float(x) for x in individual])
@@ -88,6 +94,7 @@ def _evaluar_poblacion_generacion(
             fit, _ = evaluar_cromosoma(
                 crom,
                 semilla=semilla,
+                duracion=perfil_cfg.duracion_evaluacion_fitness,
                 escenario=escenario_fitness,
                 multi_escenario=multi_escenario,
             )
@@ -100,12 +107,14 @@ def ejecutar_ga(
     semilla_base: int | None = None,
     escenario_fitness: str | None = None,
     multi_escenario: bool | None = None,
+    perfil_entrenamiento: str | None = None,
 ) -> Tuple[Cromosoma, List[float]]:
     """
     Evoluciona una población y devuelve el mejor cromosoma y la serie de mejores fitness
     por generación (misma longitud que `GENERACIONES_GA`, sin incluir la estadística inicial).
     """
     semilla_base = semilla_base if semilla_base is not None else config.SEMILLA_ALEATORIA
+    perfil_cfg = config.obtener_perfil_entrenamiento(perfil_entrenamiento)
     random.seed(semilla_base)
     np.random.seed(semilla_base % (2**32))
 
@@ -126,7 +135,7 @@ def ejecutar_ga(
     toolbox.register("mutate", _mut_gauss, mu=0.0, sigma=0.08, indpb=config.PROB_MUTACION)
     toolbox.register("select", tools.selTournament, tournsize=3)
 
-    pop = toolbox.population(n=config.POBLACION_GA)
+    pop = toolbox.population(n=perfil_cfg.poblacion_ga)
     hof = tools.HallOfFame(1)
     stats = tools.Statistics(lambda ind: ind.fitness.values)
     stats.register("max", np.max)
@@ -137,6 +146,7 @@ def ejecutar_ga(
         pop,
         generacion=0,
         semilla_base=semilla_base,
+        perfil_entrenamiento=perfil_cfg.clave,
         escenario_fitness=escenario_fitness,
         multi_escenario=multi_escenario,
     )
@@ -144,7 +154,8 @@ def ejecutar_ga(
     record = stats.compile(pop) if stats else {}
     logbook.record(gen=0, nevals=len(pop), **record)
 
-    for gen in range(1, config.GENERACIONES_GA + 1):
+    for gen in range(1, perfil_cfg.generaciones_ga + 1):
+        print(f"Generación {gen}/{perfil_cfg.generaciones_ga} [{perfil_cfg.etiqueta_ui}]")
         offspring = toolbox.select(pop, len(pop))
         offspring = list(map(toolbox.clone, offspring))
 
@@ -163,6 +174,7 @@ def ejecutar_ga(
             offspring,
             generacion=gen,
             semilla_base=semilla_base,
+            perfil_entrenamiento=perfil_cfg.clave,
             escenario_fitness=escenario_fitness,
             multi_escenario=multi_escenario,
         )
@@ -175,27 +187,33 @@ def ejecutar_ga(
     mejor = Cromosoma([float(x) for x in hof[0]])
     # Gen 0 = población inicial; dejamos una entrada por generación evolutiva.
     todos_max = list(logbook.select("max"))
-    historial = [float(x) for x in todos_max[1 : 1 + config.GENERACIONES_GA]]
-    if len(historial) < config.GENERACIONES_GA:
+    historial = [float(x) for x in todos_max[1 : 1 + perfil_cfg.generaciones_ga]]
+    if len(historial) < perfil_cfg.generaciones_ga:
         historial = [float(x) for x in todos_max[1:]]
     return mejor, historial
 
 
-def ejecutar_entrenamiento_banco(semilla_base: int | None = None):
+def ejecutar_entrenamiento_banco(
+    semilla_base: int | None = None,
+    perfil_entrenamiento: str | None = None,
+):
     """
     Entrena un cromosoma por cada etiqueta de contexto (un escenario GA cada uno).
     """
     from adaptacion.banco import BancoCromosomas, ETIQUETAS_VALIDAS, guardar_banco
 
     semilla_base = semilla_base if semilla_base is not None else config.SEMILLA_ALEATORIA
+    perfil_cfg = config.obtener_perfil_entrenamiento(perfil_entrenamiento)
     por: dict = {}
     for i, esc in enumerate(ETIQUETAS_VALIDAS):
+        print(f"\n=== Entrenando escenario: {esc} ===")
         mejor, _ = ejecutar_ga(
             semilla_base=semilla_base + 10007 * i + 3,
             escenario_fitness=esc,
             multi_escenario=False,
+            perfil_entrenamiento=perfil_cfg.clave,
         )
         por[esc] = mejor
     banco = BancoCromosomas(por_contexto=por)
-    guardar_banco(config.ARCHIVO_BANCO_CROMOSOMAS, banco)
+    guardar_banco(perfil_cfg.archivo_banco_cromosomas, banco)
     return banco

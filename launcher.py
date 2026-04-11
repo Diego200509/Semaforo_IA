@@ -8,7 +8,6 @@ from __future__ import annotations
 
 import subprocess
 import sys
-import webbrowser
 from pathlib import Path
 
 try:
@@ -29,6 +28,8 @@ PYTHON_312_PATHS = (
 )
 
 ESCENARIOS = ("bajo", "pico", "desbalanceado", "mixto")
+PERFILES_ENTRENAMIENTO_UI = tuple(cfg.PERFILES_ENTRENAMIENTO_UI)
+PERFIL_UI_A_CLAVE = {perfil.etiqueta_ui: perfil.clave for perfil in cfg.PERFILES_ENTRENAMIENTO.values()}
 
 
 def _probar_comando_python(cmd: list[str]) -> bool:
@@ -104,6 +105,7 @@ def _validar_opciones_sim(
 def _args_sim_base(
     escenario: str,
     *,
+    perfil_entrenamiento: str,
     usar_default: bool,
     usar_ga: bool,
     adaptacion_banco: bool,
@@ -111,7 +113,7 @@ def _args_sim_base(
     verbose_escenario: bool,
     no_fase_adaptativa: bool,
 ) -> list[str]:
-    args: list[str] = ["--escenario", escenario]
+    args: list[str] = ["--escenario", escenario, "--perfil-entrenamiento", perfil_entrenamiento]
     if usar_default:
         args.append("--usar-default")
     if usar_ga:
@@ -132,7 +134,7 @@ class LauncherApp(tk.Tk):
         super().__init__()
         self.title("Semáforo inteligente — Menú principal")
         self.minsize(480, 560)
-        self.geometry("580x620")
+        self.geometry("600x700")
 
         self._duracion_comparar_default = float(cfg.DURACION_COMPARAR_DIFUSO_GA)
 
@@ -149,8 +151,6 @@ class LauncherApp(tk.Tk):
 
         pie = ttk.Frame(self, padding=(8, 0, 8, 8))
         pie.pack(fill=tk.X)
-        ttk.Button(pie, text="Abrir documentación (README)", command=self._abrir_readme).pack(side=tk.LEFT, padx=(0, 6))
-        ttk.Button(pie, text="Ver comandos de consola", command=self._ayuda_cli).pack(side=tk.LEFT, padx=(0, 6))
         ttk.Button(pie, text="Cerrar menú", command=self.destroy).pack(side=tk.RIGHT)
 
     def _enlazar_exclusiones_control_semaforo(self) -> None:
@@ -210,17 +210,24 @@ class LauncherApp(tk.Tk):
         """Una o dos frases cortas según lo marcado; evita el bloque de texto fijo largo."""
         if not hasattr(self, "lbl_nota_opciones"):
             return
+        perfil = cfg.obtener_perfil_entrenamiento(self._perfil_sim_clave())
         partes: list[str] = []
         if self.var_tiempo_fijo.get():
             partes.append("Semáforo fijo: sin difuso. Las otras tres opciones de reglas quedan desmarcadas.")
         elif self.var_banco.get():
-            partes.append("Banco activo: el difuso cambia de configuración según el tráfico.")
+            partes.append(
+                f"Banco activo [{perfil.etiqueta_ui}]: el difuso usa {perfil.archivo_banco_cromosomas.name}."
+            )
         elif self.var_ga.get():
-            partes.append("Solo entrenamiento GA: hace falta el archivo guardado del último entrenamiento.")
+            partes.append(
+                f"GA activo [{perfil.etiqueta_ui}]: se cargará {perfil.archivo_mejor_cromosoma.name}."
+            )
         elif self.var_default.get():
             partes.append("Reglas difusas estándar: no se usan archivos de entrenamiento.")
         else:
-            partes.append("Automático: si existe archivo de entrenamiento se usa; si no, reglas estándar.")
+            partes.append(
+                f"Automático [{perfil.etiqueta_ui}]: si existe {perfil.archivo_mejor_cromosoma.name} se usa; si no, reglas estándar."
+            )
         extra: list[str] = []
         if self.var_verbose.get():
             extra.append("Consola: ver cambios de tráfico (útil con escenario «mixto»).")
@@ -258,6 +265,17 @@ class LauncherApp(tk.Tk):
         self.var_tiempo_fijo = tk.BooleanVar(value=False)
         self.var_verbose = tk.BooleanVar(value=False)
         self.var_no_adapt = tk.BooleanVar(value=False)
+        self.var_perfil_sim = tk.StringVar(value=cfg.obtener_perfil_entrenamiento().etiqueta_ui)
+        fila_perfil = ttk.Frame(lf_opt)
+        fila_perfil.pack(fill=tk.X, pady=(0, 8))
+        ttk.Label(fila_perfil, text="Perfil de entrenamiento:").pack(side=tk.LEFT)
+        ttk.Combobox(
+            fila_perfil,
+            textvariable=self.var_perfil_sim,
+            values=PERFILES_ENTRENAMIENTO_UI,
+            state="readonly",
+            width=12,
+        ).pack(side=tk.LEFT, padx=8)
         ttk.Checkbutton(
             lf_opt,
             text="Usar reglas por defecto (ignorar archivos de entrenamiento)",
@@ -292,6 +310,7 @@ class LauncherApp(tk.Tk):
         self.lbl_nota_opciones = ttk.Label(lf_opt, text="", wraplength=500)
         self.lbl_nota_opciones.pack(anchor=tk.W, pady=(10, 0))
         for _v in (
+            self.var_perfil_sim,
             self.var_default,
             self.var_ga,
             self.var_banco,
@@ -331,6 +350,21 @@ class LauncherApp(tk.Tk):
             text="Busca mejores tiempos de verde; guarda un archivo y una curva en la carpeta graficas/.",
             wraplength=520,
         ).pack(anchor=tk.W, pady=(0, 6))
+        fila_perfil = ttk.Frame(lf_ga)
+        fila_perfil.pack(fill=tk.X, pady=(0, 6))
+        self.var_perfil_train = tk.StringVar(value=cfg.obtener_perfil_entrenamiento().etiqueta_ui)
+        ttk.Label(fila_perfil, text="Perfil de entrenamiento:").pack(side=tk.LEFT)
+        ttk.Combobox(
+            fila_perfil,
+            textvariable=self.var_perfil_train,
+            values=PERFILES_ENTRENAMIENTO_UI,
+            state="readonly",
+            width=12,
+        ).pack(side=tk.LEFT, padx=8)
+        self.lbl_nota_perfil_train = ttk.Label(lf_ga, text="", wraplength=520)
+        self.lbl_nota_perfil_train.pack(anchor=tk.W, pady=(0, 6))
+        self.var_perfil_train.trace_add("write", lambda *_: self._refrescar_nota_perfil_train())
+        self._refrescar_nota_perfil_train()
         ttk.Button(
             lf_ga,
             text="Entrenar una sola configuración óptima (recomendado para empezar)",
@@ -384,12 +418,30 @@ class LauncherApp(tk.Tk):
             wraplength=520,
         ).pack(fill=tk.X, pady=(8, 0))
 
-    def _flags_sim(self) -> tuple[str, dict[str, bool]] | None:
+    def _perfil_sim_clave(self) -> str:
+        return PERFIL_UI_A_CLAVE.get(self.var_perfil_sim.get(), cfg.PERFIL_ENTRENAMIENTO_POR_DEFECTO)
+
+    def _perfil_train_clave(self) -> str:
+        return PERFIL_UI_A_CLAVE.get(self.var_perfil_train.get(), cfg.PERFIL_ENTRENAMIENTO_POR_DEFECTO)
+
+    def _refrescar_nota_perfil_train(self) -> None:
+        if not hasattr(self, "lbl_nota_perfil_train"):
+            return
+        perfil = cfg.obtener_perfil_entrenamiento(self._perfil_train_clave())
+        self.lbl_nota_perfil_train.configure(
+            text=(
+                f"{perfil.etiqueta_ui}: población {perfil.poblacion_ga}, generaciones {perfil.generaciones_ga}, "
+                f"salida {perfil.archivo_mejor_cromosoma.name} / {perfil.archivo_banco_cromosomas.name}"
+            )
+        )
+
+    def _flags_sim(self) -> tuple[str, dict[str, bool | str]] | None:
         esc = self.var_escenario.get().strip().lower()
         if esc not in ESCENARIOS:
             messagebox.showerror("Escenario", f"Escenario no válido: {esc}")
             return None
         d = {
+            "perfil_entrenamiento": self._perfil_sim_clave(),
             "usar_default": self.var_default.get(),
             "usar_ga": self.var_ga.get(),
             "adaptacion_banco": self.var_banco.get(),
@@ -432,10 +484,10 @@ class LauncherApp(tk.Tk):
         _popen_main(args)
 
     def _entrenar(self) -> None:
-        _popen_main(["--modo", "entrenar"])
+        _popen_main(["--modo", "entrenar", "--perfil-entrenamiento", self._perfil_train_clave()])
 
     def _entrenar_banco(self) -> None:
-        _popen_main(["--modo", "entrenar_banco"])
+        _popen_main(["--modo", "entrenar_banco", "--perfil-entrenamiento", self._perfil_train_clave()])
 
     def _comparar(self) -> None:
         try:
@@ -449,20 +501,21 @@ class LauncherApp(tk.Tk):
         if esc not in ESCENARIOS:
             messagebox.showerror("Escenario", f"Escenario no válido: {esc}")
             return
-        _popen_main(["--modo", "comparar", "--segundos", str(seg), "--escenario", esc])
+        _popen_main(
+            [
+                "--modo",
+                "comparar",
+                "--segundos",
+                str(seg),
+                "--escenario",
+                esc,
+                "--perfil-entrenamiento",
+                self._perfil_train_clave(),
+            ]
+        )
 
     def _comparar_completo(self) -> None:
-        _popen_main(["--modo", "comparar_completo"])
-
-    def _abrir_readme(self) -> None:
-        readme = RAIZ / "README.md"
-        if readme.is_file():
-            webbrowser.open(readme.as_uri())
-        else:
-            messagebox.showwarning("README", f"No se encontró {readme}")
-
-    def _ayuda_cli(self) -> None:
-        _popen_main(["--help"])
+        _popen_main(["--modo", "comparar_completo", "--perfil-entrenamiento", self._perfil_train_clave()])
 
 
 def main() -> int:

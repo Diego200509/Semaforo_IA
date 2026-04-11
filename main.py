@@ -34,13 +34,15 @@ def _resolver_callback_difuso(
     mejor_cromosoma_legacy: bool,
     adaptacion_banco: bool,
     ruta_banco: Path | None,
+    perfil_entrenamiento: str,
 ) -> tuple[Optional[CallbackVerde], MensajeParametros]:
-    ruta = config.ARCHIVO_MEJOR_CROMOSOMA
+    perfil_cfg = config.obtener_perfil_entrenamiento(perfil_entrenamiento)
+    ruta = perfil_cfg.archivo_mejor_cromosoma
     existe = ruta.is_file()
     base = parametros_por_defecto()
 
     if adaptacion_banco:
-        rb = ruta_banco or config.ARCHIVO_BANCO_CROMOSOMAS
+        rb = ruta_banco or perfil_cfg.archivo_banco_cromosomas
         if not rb.is_file():
             parser.error(
                 f"No se encontró el banco de cromosomas en {rb}. "
@@ -93,6 +95,7 @@ def modo_simulacion_visual(
     adaptacion_banco: bool,
     ruta_banco: Path | None,
     fase_adaptativa: bool,
+    perfil_entrenamiento: str,
 ) -> None:
     if tiempo_fijo:
         control = None
@@ -104,10 +107,13 @@ def modo_simulacion_visual(
             mejor_cromosoma_legacy=mejor_cromosoma_legacy,
             adaptacion_banco=adaptacion_banco,
             ruta_banco=ruta_banco,
+            perfil_entrenamiento=perfil_entrenamiento,
         )
         _imprimir_aviso_parametros(msg)
 
+    perfil_cfg = config.obtener_perfil_entrenamiento(perfil_entrenamiento)
     print(f"Escenario de tráfico: {escenario}")
+    print(f"Perfil cargado: {perfil_cfg.etiqueta_ui}")
 
     motor = MotorSimulacionPygame(
         semilla=config.SEMILLA_ALEATORIA,
@@ -143,6 +149,7 @@ def modo_simulacion_programatica(
     adaptacion_banco: bool,
     ruta_banco: Path | None,
     fase_adaptativa: bool,
+    perfil_entrenamiento: str,
 ) -> None:
     if tiempo_fijo:
         control = None
@@ -154,10 +161,13 @@ def modo_simulacion_programatica(
             mejor_cromosoma_legacy=mejor_cromosoma_legacy,
             adaptacion_banco=adaptacion_banco,
             ruta_banco=ruta_banco,
+            perfil_entrenamiento=perfil_entrenamiento,
         )
         _imprimir_aviso_parametros(msg)
 
+    perfil_cfg = config.obtener_perfil_entrenamiento(perfil_entrenamiento)
     print(f"Escenario de tráfico: {escenario}")
+    print(f"Perfil cargado: {perfil_cfg.etiqueta_ui}")
 
     motor = MotorSimulacionProgramatico(
         semilla=config.SEMILLA_ALEATORIA,
@@ -186,33 +196,45 @@ def modo_simulacion_programatica(
             )
 
 
-def modo_entrenar() -> None:
+def modo_entrenar(perfil_entrenamiento: str) -> None:
     from evaluacion.graficas import graficar_evolucion_fitness
     # Import perezoso: sim_visual y sim_prog no deben depender de DEAP.
     from genetico.ga import ejecutar_ga
 
-    print("Entrenando GA (puede tardar varios minutos)...")
+    perfil_cfg = config.obtener_perfil_entrenamiento(perfil_entrenamiento)
+    print(f"Entrenando GA [{perfil_cfg.etiqueta_ui}] (puede tardar varios minutos)...")
     if config.USA_ENTRENAMIENTO_MULTI_ESCENARIO:
         print(f"Fitness: promedio ponderado sobre escenarios {config.ESCENARIOS_ENTRENAMIENTO_GA}")
     else:
         print(f"Escenario de tráfico en fitness: {config.ESCENARIO_ENTRENAMIENTO_GA}")
-    mejor, historial = ejecutar_ga(semilla_base=config.SEMILLA_ALEATORIA)
-    mejor.guardar_json(config.ARCHIVO_MEJOR_CROMOSOMA)
-    print(f"Mejor cromosoma guardado en: {config.ARCHIVO_MEJOR_CROMOSOMA}")
-    graficar_evolucion_fitness(historial, mostrar=False)
-    print(f"Gráfica de evolución: {config.ARCHIVO_GRAFICA_EVOLUCION_FITNESS}")
+    mejor, historial = ejecutar_ga(
+        semilla_base=config.SEMILLA_ALEATORIA,
+        perfil_entrenamiento=perfil_cfg.clave,
+    )
+    mejor.guardar_json(perfil_cfg.archivo_mejor_cromosoma)
+    print(f"Mejor cromosoma guardado en: {perfil_cfg.archivo_mejor_cromosoma}")
+    graficar_evolucion_fitness(
+        historial,
+        ruta_salida=perfil_cfg.archivo_grafica_evolucion,
+        mostrar=False,
+    )
+    print(f"Gráfica de evolución: {perfil_cfg.archivo_grafica_evolucion}")
 
 
-def modo_entrenar_banco() -> None:
+def modo_entrenar_banco(perfil_entrenamiento: str) -> None:
     # Import perezoso: el banco solo se necesita al entrenar, no al abrir la simulación.
     from genetico.ga import ejecutar_entrenamiento_banco
 
-    print("Entrenando banco de cromosomas (4 GA secuenciales; puede tardar mucho)...")
-    ejecutar_entrenamiento_banco(semilla_base=config.SEMILLA_ALEATORIA)
-    print(f"Banco guardado en: {config.ARCHIVO_BANCO_CROMOSOMAS}")
+    perfil_cfg = config.obtener_perfil_entrenamiento(perfil_entrenamiento)
+    print(f"Entrenando banco de cromosomas [{perfil_cfg.etiqueta_ui}] (4 GA secuenciales; puede tardar mucho)...")
+    ejecutar_entrenamiento_banco(
+        semilla_base=config.SEMILLA_ALEATORIA,
+        perfil_entrenamiento=perfil_cfg.clave,
+    )
+    print(f"Banco guardado en: {perfil_cfg.archivo_banco_cromosomas}")
 
 
-def modo_comparar(duracion: float, escenario: str) -> None:
+def modo_comparar(duracion: float, escenario: str, perfil_entrenamiento: str) -> None:
     """Promedios multisemilla (3 estrategias) + gráfica por escenario de tráfico."""
     from evaluacion.comparacion import metricas_promedio_por_escenario_y_estrategia
     from evaluacion.graficas import (
@@ -220,9 +242,10 @@ def modo_comparar(duracion: float, escenario: str) -> None:
         graficar_estrategias_promedio_multimetrica,
     )
 
-    if not config.ARCHIVO_MEJOR_CROMOSOMA.is_file():
+    perfil_cfg = config.obtener_perfil_entrenamiento(perfil_entrenamiento)
+    if not perfil_cfg.archivo_mejor_cromosoma.is_file():
         print(
-            "Aviso: no hay mejor_cromosoma.json; la comparación solo incluirá "
+            f"Aviso: no hay {perfil_cfg.archivo_mejor_cromosoma.name}; la comparación solo incluirá "
             "'Tiempo fijo' y 'Difuso (base)'."
         )
 
@@ -236,31 +259,44 @@ def modo_comparar(duracion: float, escenario: str) -> None:
     resultados = ejecutar_comparacion_promedios_multisemilla(
         duracion=duracion,
         escenario=escenario,
+        perfil_entrenamiento=perfil_cfg.clave,
     )
     for r in resultados:
         print(f"=== {r.nombre} (promedio, n={len(r.semillas)}) ===")
         print(resumen_legible(r.metricas_promedio))
         print(f"Coste promedio: {r.coste_promedio:.4f} (menor es mejor)\n")
 
-    graficar_estrategias_promedio_multimetrica(resultados, mostrar=False)
-    print(f"Gráfica estrategias (promedios): {config.ARCHIVO_GRAFICA_ESTRATEGIAS_PROMEDIO}")
+    graficar_estrategias_promedio_multimetrica(
+        resultados,
+        ruta_salida=perfil_cfg.archivo_grafica_estrategias_promedio,
+        mostrar=False,
+    )
+    print(f"Gráfica estrategias (promedios): {perfil_cfg.archivo_grafica_estrategias_promedio}")
 
     print("Calculando matriz escenario × estrategia (puede tardar un poco)...")
-    matriz = metricas_promedio_por_escenario_y_estrategia(duracion=duracion)
-    graficar_comparacion_por_escenario(matriz, mostrar=False)
-    print(f"Gráfica por escenario: {config.ARCHIVO_GRAFICA_POR_ESCENARIO}")
+    matriz = metricas_promedio_por_escenario_y_estrategia(
+        duracion=duracion,
+        perfil_entrenamiento=perfil_cfg.clave,
+    )
+    graficar_comparacion_por_escenario(
+        matriz,
+        ruta_salida=perfil_cfg.archivo_grafica_por_escenario,
+        mostrar=False,
+    )
+    print(f"Gráfica por escenario: {perfil_cfg.archivo_grafica_por_escenario}")
 
 
-def modo_comparar_completo() -> None:
+def modo_comparar_completo(perfil_entrenamiento: str) -> None:
     from evaluacion.graficas import graficar_barras_comparacion
 
-    if not config.ARCHIVO_MEJOR_CROMOSOMA.is_file():
+    perfil_cfg = config.obtener_perfil_entrenamiento(perfil_entrenamiento)
+    if not perfil_cfg.archivo_mejor_cromosoma.is_file():
         print(
-            "Aviso: no existe archivo de cromosoma optimizado; la comparación será solo "
+            f"Aviso: no existe {perfil_cfg.archivo_mejor_cromosoma.name}; la comparación será solo "
             "'fijo' vs 'difuso base'. Ejecuta antes: python main.py --modo entrenar"
         )
     print(f"Escenario tráfico: {config.ESCENARIO_COMPARAR_COMPLETO} | Semilla: {config.SEED_COMPARACION}")
-    resultados = ejecutar_comparacion()
+    resultados = ejecutar_comparacion(perfil_entrenamiento=perfil_cfg.clave)
     for r in resultados:
         print(f"\n=== {r.nombre} ===")
         print(resumen_legible(r.metricas))
@@ -268,9 +304,10 @@ def modo_comparar_completo() -> None:
     graficar_barras_comparacion(
         [r.nombre for r in resultados],
         [r.coste for r in resultados],
+        ruta_salida=perfil_cfg.archivo_grafica_comparacion_costes,
         mostrar=False,
     )
-    print(f"\nGráfica de barras guardada en: {config.ARCHIVO_GRAFICA_COMPARACION_COSTES}")
+    print(f"\nGráfica de barras guardada en: {perfil_cfg.archivo_grafica_comparacion_costes}")
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -351,6 +388,12 @@ def main(argv: list[str] | None = None) -> int:
             f"en comparar es {config.DURACION_COMPARAR_DIFUSO_GA:.0f}."
         ),
     )
+    parser.add_argument(
+        "--perfil-entrenamiento",
+        choices=sorted(config.PERFILES_ENTRENAMIENTO.keys()),
+        default=config.PERFIL_ENTRENAMIENTO_POR_DEFECTO,
+        help="Selecciona qué perfil usar para cargar o guardar archivos de entrenamiento: prueba | final.",
+    )
     args = parser.parse_args(argv)
 
     seg_prog = args.segundos if args.segundos is not None else 90.0
@@ -376,6 +419,7 @@ def main(argv: list[str] | None = None) -> int:
             adaptacion_banco=args.adaptacion_banco,
             ruta_banco=args.banco_cromosomas,
             fase_adaptativa=fase_adaptativa,
+            perfil_entrenamiento=args.perfil_entrenamiento,
         )
     elif args.modo == "sim_prog":
         modo_simulacion_programatica(
@@ -390,15 +434,16 @@ def main(argv: list[str] | None = None) -> int:
             adaptacion_banco=args.adaptacion_banco,
             ruta_banco=args.banco_cromosomas,
             fase_adaptativa=fase_adaptativa,
+            perfil_entrenamiento=args.perfil_entrenamiento,
         )
     elif args.modo == "entrenar":
-        modo_entrenar()
+        modo_entrenar(args.perfil_entrenamiento)
     elif args.modo == "entrenar_banco":
-        modo_entrenar_banco()
+        modo_entrenar_banco(args.perfil_entrenamiento)
     elif args.modo == "comparar":
-        modo_comparar(seg_comparar, esc)
+        modo_comparar(seg_comparar, esc, args.perfil_entrenamiento)
     elif args.modo == "comparar_completo":
-        modo_comparar_completo()
+        modo_comparar_completo(args.perfil_entrenamiento)
     else:
         parser.error("Modo no reconocido.")
     return 0

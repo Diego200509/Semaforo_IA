@@ -3,6 +3,7 @@ Configuración global del proyecto: dimensiones, tiempos, límites y rutas.
 Centralizar constantes aquí facilita experimentos y la defensa académica del sistema.
 """
 
+from dataclasses import dataclass
 from pathlib import Path
 
 # --- Rutas del proyecto ---
@@ -20,6 +21,71 @@ CARPETA_GRAFICAS = RAIZ_PROYECTO / "graficas"
 def asegurar_carpeta_graficas() -> None:
     """Crea la carpeta de gráficas si no existe."""
     CARPETA_GRAFICAS.mkdir(parents=True, exist_ok=True)
+
+
+@dataclass(frozen=True)
+class PerfilEntrenamiento:
+    """
+    Dos perfiles simples para separar pruebas rápidas de corridas finales.
+    """
+
+    clave: str
+    etiqueta_ui: str
+    poblacion_ga: int
+    generaciones_ga: int
+    semillas_compartidas_por_generacion: int
+    duracion_evaluacion_fitness: float
+    archivo_mejor_cromosoma: Path
+    archivo_banco_cromosomas: Path
+    archivo_grafica_evolucion: Path
+    archivo_grafica_estrategias_promedio: Path
+    archivo_grafica_por_escenario: Path
+    archivo_grafica_comparacion_costes: Path
+
+
+PERFIL_ENTRENAMIENTO_POR_DEFECTO = "final"
+PERFILES_ENTRENAMIENTO = {
+    "prueba": PerfilEntrenamiento(
+        clave="prueba",
+        etiqueta_ui="PRUEBA",
+        poblacion_ga=10,
+        generaciones_ga=6,
+        semillas_compartidas_por_generacion=2,
+        duracion_evaluacion_fitness=45.0,
+        archivo_mejor_cromosoma=RAIZ_PROYECTO / "cromosoma_prueba.json",
+        archivo_banco_cromosomas=RAIZ_PROYECTO / "banco_prueba.json",
+        archivo_grafica_evolucion=CARPETA_GRAFICAS / "evolucion_fitness_prueba.png",
+        archivo_grafica_estrategias_promedio=CARPETA_GRAFICAS / "comparacion_estrategias_promedio_prueba.png",
+        archivo_grafica_por_escenario=CARPETA_GRAFICAS / "comparacion_por_escenario_prueba.png",
+        archivo_grafica_comparacion_costes=CARPETA_GRAFICAS / "comparacion_costes_prueba.png",
+    ),
+    "final": PerfilEntrenamiento(
+        clave="final",
+        etiqueta_ui="FINAL",
+        poblacion_ga=24,
+        generaciones_ga=18,
+        semillas_compartidas_por_generacion=3,
+        duracion_evaluacion_fitness=120.0,
+        archivo_mejor_cromosoma=RAIZ_PROYECTO / "cromosoma_final.json",
+        archivo_banco_cromosomas=RAIZ_PROYECTO / "banco_final.json",
+        archivo_grafica_evolucion=CARPETA_GRAFICAS / "evolucion_fitness_final.png",
+        archivo_grafica_estrategias_promedio=CARPETA_GRAFICAS / "comparacion_estrategias_promedio_final.png",
+        archivo_grafica_por_escenario=CARPETA_GRAFICAS / "comparacion_por_escenario_final.png",
+        archivo_grafica_comparacion_costes=CARPETA_GRAFICAS / "comparacion_costes_final.png",
+    ),
+}
+PERFILES_ENTRENAMIENTO_UI = tuple(p.etiqueta_ui for p in PERFILES_ENTRENAMIENTO.values())
+
+
+def obtener_perfil_entrenamiento(perfil: str | None = None) -> PerfilEntrenamiento:
+    """
+    Normaliza el nombre del perfil y devuelve su configuración completa.
+    """
+    clave = (perfil or PERFIL_ENTRENAMIENTO_POR_DEFECTO).strip().lower()
+    if clave not in PERFILES_ENTRENAMIENTO:
+        validos = ", ".join(sorted(PERFILES_ENTRENAMIENTO))
+        raise ValueError(f"Perfil de entrenamiento no válido: {perfil}. Use: {validos}")
+    return PERFILES_ENTRENAMIENTO[clave]
 
 
 # --- Ventana Pygame (simulación visual) ---
@@ -127,7 +193,7 @@ PESOS_SPAWN_TIPO_VEHICULO = (0.18, 0.52, 0.15, 0.15)
 ESCENARIOS_ENTRENAMIENTO_GA = ("bajo", "pico", "desbalanceado", "mixto")
 PESOS_ENTRENAMIENTO_MULTI_ESCENARIO = (0.25, 0.25, 0.25, 0.25)
 USA_ENTRENAMIENTO_MULTI_ESCENARIO = True
-ARCHIVO_BANCO_CROMOSOMAS = RAIZ_PROYECTO / "banco_cromosomas.json"
+ARCHIVO_BANCO_CROMOSOMAS = obtener_perfil_entrenamiento("final").archivo_banco_cromosomas
 # Radio (px) alrededor del centro: dentro se aplica tope de velocidad por factor_despeje (cruce ocupado más tiempo).
 RADIO_ZONA_CRUCE_INTERIOR = 58.0
 
@@ -162,7 +228,7 @@ PESO_LONGITUD_COLA = 0.3
 PESO_VEHICULOS_ATENDIDOS = 0.2
 
 # Archivo donde se guarda el mejor cromosoma tras entrenar.
-ARCHIVO_MEJOR_CROMOSOMA = RAIZ_PROYECTO / "mejor_cromosoma.json"
+ARCHIVO_MEJOR_CROMOSOMA = obtener_perfil_entrenamiento("final").archivo_mejor_cromosoma
 
 # --- Escenarios de tráfico (solo generación; no afecta difuso/GA) ---
 ESCENARIO_POR_DEFECTO = "bajo"
@@ -182,7 +248,7 @@ SEEDS_COMPARACION_MULTISEMILLA = [1, 7, 15, 23, 42]
 ESCENARIO_ENTRENAMIENTO_GA = "bajo"
 
 # Salida de gráficas de evaluación (dentro de CARPETA_GRAFICAS).
-ARCHIVO_GRAFICA_EVOLUCION_FITNESS = CARPETA_GRAFICAS / "evolucion_fitness.png"
+ARCHIVO_GRAFICA_EVOLUCION_FITNESS = obtener_perfil_entrenamiento("final").archivo_grafica_evolucion
 ARCHIVO_GRAFICA_COMPARACION_COSTES = CARPETA_GRAFICAS / "comparacion_costes.png"
 ARCHIVO_GRAFICA_COMPARAR_GA = CARPETA_GRAFICAS / "comparacion_sin_ga_vs_ga.png"
 ARCHIVO_GRAFICA_ESTRATEGIAS_PROMEDIO = CARPETA_GRAFICAS / "comparacion_estrategias_promedio.png"

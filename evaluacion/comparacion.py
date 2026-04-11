@@ -47,6 +47,10 @@ class ResultadoPromedioEstrategia:
     semillas: List[int]
 
 
+def _ruta_cromosoma_entrenado(perfil_entrenamiento: str | None = None):
+    return config.obtener_perfil_entrenamiento(perfil_entrenamiento).archivo_mejor_cromosoma
+
+
 def promediar_metricas(metricas_list: List[dict]) -> dict:
     """Promedia claves numéricas; ignora `segmentos_mixto`."""
     if not metricas_list:
@@ -124,6 +128,7 @@ def ejecutar_comparacion(
     duracion: float | None = None,
     dt: float | None = None,
     escenario: str | None = None,
+    perfil_entrenamiento: str | None = None,
 ) -> List[ResultadoEscenario]:
     """Una semilla; tres políticas. Usado por `comparar_completo`."""
     semilla = semilla if semilla is not None else config.SEED_COMPARACION
@@ -144,8 +149,9 @@ def ejecutar_comparacion(
         ResultadoEscenario("Difuso (base)", m_dif, coste_desde_metricas(m_dif))
     )
 
-    if config.ARCHIVO_MEJOR_CROMOSOMA.is_file():
-        crom = Cromosoma.cargar_json(config.ARCHIVO_MEJOR_CROMOSOMA)
+    ruta_crom = _ruta_cromosoma_entrenado(perfil_entrenamiento)
+    if ruta_crom.is_file():
+        crom = Cromosoma.cargar_json(ruta_crom)
         ctrl_opt = ControladorDifuso(crom.decodificar())
         m_opt = _simular_difuso(semilla, duracion, dt, ctrl_opt, esc, duracion)
         resultados.append(
@@ -160,6 +166,7 @@ def ejecutar_comparacion_promedios_multisemilla(
     duracion: float | None = None,
     dt: float | None = None,
     escenario: str | None = None,
+    perfil_entrenamiento: str | None = None,
 ) -> List[ResultadoPromedioEstrategia]:
     """
     Para cada estrategia (fijo, difuso base, difuso+GA) ejecuta una corrida por semilla
@@ -199,8 +206,9 @@ def ejecutar_comparacion_promedios_multisemilla(
         )
     )
 
-    if config.ARCHIVO_MEJOR_CROMOSOMA.is_file():
-        crom = Cromosoma.cargar_json(config.ARCHIVO_MEJOR_CROMOSOMA)
+    ruta_crom = _ruta_cromosoma_entrenado(perfil_entrenamiento)
+    if ruta_crom.is_file():
+        crom = Cromosoma.cargar_json(ruta_crom)
         ctrl_opt = ControladorDifuso(crom.decodificar())
         mats_ga: List[dict] = []
         for s in semillas:
@@ -222,6 +230,7 @@ def metricas_promedio_por_escenario_y_estrategia(
     semillas: List[int] | None = None,
     duracion: float | None = None,
     dt: float | None = None,
+    perfil_entrenamiento: str | None = None,
 ) -> Dict[str, Dict[str, dict]]:
     """
     Para cada escenario de tráfico y cada estrategia, métricas promediadas en `semillas`.
@@ -234,6 +243,7 @@ def metricas_promedio_por_escenario_y_estrategia(
 
     escenarios = [e for e in NOMBRES_ESCENARIOS_VALIDOS]
     out: Dict[str, Dict[str, dict]] = {}
+    ruta_crom = _ruta_cromosoma_entrenado(perfil_entrenamiento)
 
     for esc in escenarios:
         out[esc] = {}
@@ -244,8 +254,8 @@ def metricas_promedio_por_escenario_y_estrategia(
         mats_b = [_simular_difuso(s, duracion, dt, ctrl_base, esc, duracion) for s in semillas]
         out[esc]["Difuso (base)"] = promediar_metricas(mats_b)
 
-        if config.ARCHIVO_MEJOR_CROMOSOMA.is_file():
-            crom = Cromosoma.cargar_json(config.ARCHIVO_MEJOR_CROMOSOMA)
+        if ruta_crom.is_file():
+            crom = Cromosoma.cargar_json(ruta_crom)
             ctrl_opt = ControladorDifuso(crom.decodificar())
             mats_g = [_simular_difuso(s, duracion, dt, ctrl_opt, esc, duracion) for s in semillas]
             out[esc]["Difuso + GA"] = promediar_metricas(mats_g)
@@ -258,6 +268,7 @@ def ejecutar_comparacion_difuso_vs_ga(
     duracion: float | None = None,
     dt: float | None = None,
     escenario: str | None = None,
+    perfil_entrenamiento: str | None = None,
 ) -> ResultadoComparacionDifusoGA:
     """Dos corridas con la misma semilla (difuso base vs GA)."""
     semilla = semilla if semilla is not None else config.SEED_COMPARACION
@@ -269,8 +280,9 @@ def ejecutar_comparacion_difuso_vs_ga(
     m_sin = _simular_difuso(semilla, duracion, dt, ctrl_base, esc, duracion)
 
     m_con: Optional[dict] = None
-    if config.ARCHIVO_MEJOR_CROMOSOMA.is_file():
-        crom = Cromosoma.cargar_json(config.ARCHIVO_MEJOR_CROMOSOMA)
+    ruta_crom = _ruta_cromosoma_entrenado(perfil_entrenamiento)
+    if ruta_crom.is_file():
+        crom = Cromosoma.cargar_json(ruta_crom)
         ctrl_opt = ControladorDifuso(crom.decodificar())
         m_con = _simular_difuso(semilla, duracion, dt, ctrl_opt, esc, duracion)
 

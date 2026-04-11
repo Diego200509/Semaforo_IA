@@ -22,12 +22,61 @@ import config as cfg
 
 RAIZ = Path(__file__).resolve().parent
 MAIN_PY = RAIZ / "main.py"
+VENV_PYTHON = RAIZ / "venv" / "Scripts" / "python.exe"
+PYTHON_312_PATHS = (
+    Path(r"C:\Users\diego\AppData\Local\Programs\Python\Python312\python.exe"),
+    Path(r"C:\Python312\python.exe"),
+)
 
 ESCENARIOS = ("bajo", "pico", "desbalanceado", "mixto")
 
 
+def _probar_comando_python(cmd: list[str]) -> bool:
+    try:
+        proc = subprocess.run(
+            [*cmd, "--version"],
+            capture_output=True,
+            text=True,
+            timeout=5,
+            check=False,
+        )
+    except (OSError, subprocess.SubprocessError):
+        return False
+    salida = f"{proc.stdout} {proc.stderr}".strip()
+    return proc.returncode == 0 and "Python 3.12" in salida
+
+
+def _resolver_python_proyecto() -> list[str] | None:
+    """
+    El proyecto prioriza Python 3.12 porque el entorno virtual y dependencias fueron
+    preparados para esa versión.
+    """
+    if VENV_PYTHON.is_file() and _probar_comando_python([str(VENV_PYTHON)]):
+        return [str(VENV_PYTHON)]
+    if _probar_comando_python(["py", "-3.12"]):
+        return ["py", "-3.12"]
+    for ruta in PYTHON_312_PATHS:
+        if ruta.is_file() and _probar_comando_python([str(ruta)]):
+            return [str(ruta)]
+    if sys.version_info[:2] == (3, 12):
+        return [sys.executable]
+    return None
+
+
+def _mensaje_python_312_no_disponible() -> str:
+    return (
+        "Este proyecto debe ejecutarse con Python 3.12.\n\n"
+        "No encontré un intérprete 3.12 usable en esta máquina ni un venv válido.\n"
+        "Instala Python 3.12 o recrea el entorno virtual del proyecto con esa versión."
+    )
+
+
 def _popen_main(args: list[str]) -> None:
-    cmd = [sys.executable, str(MAIN_PY), *args]
+    python_cmd = _resolver_python_proyecto()
+    if python_cmd is None:
+        messagebox.showerror("Python 3.12 requerido", _mensaje_python_312_no_disponible())
+        return
+    cmd = [*python_cmd, str(MAIN_PY), *args]
     kw: dict = {"cwd": str(RAIZ)}
     if sys.platform == "win32":
         kw["creationflags"] = subprocess.CREATE_NEW_CONSOLE

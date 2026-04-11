@@ -50,10 +50,13 @@ class ControladorDifuso:
         # Si el motor envía `inferir_para_grupo_ns`, cola y espera del eje que recibe el verde.
         eje = estado.get("inferir_para_grupo_ns", None)
         if eje is True:
-            cola = float(estado.get("cola_ns", 0.0))
+            # Si existe snapshot pre-verde, usamos esa cola porque representa la demanda real al arrancar.
+            cola_preverde = estado.get("cola_ns_preverde", None)
+            cola = float(cola_preverde if cola_preverde is not None else estado.get("cola_ns", 0.0))
             esp = float(estado.get("espera_ns", estado.get("tiempo_espera_promedio", 0.0)))
         elif eje is False:
-            cola = float(estado.get("cola_ew", 0.0))
+            cola_preverde = estado.get("cola_ew_preverde", None)
+            cola = float(cola_preverde if cola_preverde is not None else estado.get("cola_ew", 0.0))
             esp = float(estado.get("espera_ew", estado.get("tiempo_espera_promedio", 0.0)))
         else:
             esp = float(estado.get("tiempo_espera_promedio", 0.0))

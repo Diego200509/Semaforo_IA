@@ -19,7 +19,6 @@ from difuso.variables import parametros_por_defecto
 from evaluacion.comparacion import ejecutar_comparacion, ejecutar_comparacion_promedios_multisemilla
 from evaluacion.metricas import resumen_legible
 from genetico.cromosoma import Cromosoma
-from genetico.ga import ejecutar_entrenamiento_banco, ejecutar_ga
 from simulacion.entorno import MotorSimulacionPygame, MotorSimulacionProgramatico
 from simulacion.escenarios import NOMBRES_ESCENARIOS_VALIDOS
 
@@ -189,6 +188,8 @@ def modo_simulacion_programatica(
 
 def modo_entrenar() -> None:
     from evaluacion.graficas import graficar_evolucion_fitness
+    # Import perezoso: sim_visual y sim_prog no deben depender de DEAP.
+    from genetico.ga import ejecutar_ga
 
     print("Entrenando GA (puede tardar varios minutos)...")
     if config.USA_ENTRENAMIENTO_MULTI_ESCENARIO:
@@ -203,6 +204,9 @@ def modo_entrenar() -> None:
 
 
 def modo_entrenar_banco() -> None:
+    # Import perezoso: el banco solo se necesita al entrenar, no al abrir la simulación.
+    from genetico.ga import ejecutar_entrenamiento_banco
+
     print("Entrenando banco de cromosomas (4 GA secuenciales; puede tardar mucho)...")
     ejecutar_entrenamiento_banco(semilla_base=config.SEMILLA_ALEATORIA)
     print(f"Banco guardado en: {config.ARCHIVO_BANCO_CROMOSOMAS}")

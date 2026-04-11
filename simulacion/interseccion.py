@@ -86,6 +86,9 @@ class Interseccion:
         self._seg_suma_cola = 0.0
         self._seg_muestras_cola = 0
         self._seg_atendidos = 0
+        # Snapshot usado por el difuso al arrancar un verde: conserva la cola previa al cambio.
+        self._cola_snapshot_preverde_ns: float | None = None
+        self._cola_snapshot_preverde_ew: float | None = None
 
     def reiniciar(self, semilla: int | None = None) -> None:
         if semilla is not None:
@@ -115,6 +118,8 @@ class Interseccion:
         self._seg_suma_cola = 0.0
         self._seg_muestras_cola = 0
         self._seg_atendidos = 0
+        self._cola_snapshot_preverde_ns = None
+        self._cola_snapshot_preverde_ew = None
         if self._control_trafico is not None:
             self._control_trafico.reiniciar()
 
@@ -489,26 +494,58 @@ class Interseccion:
                     self._clamp_a_cruz(a)
                     self._clamp_a_cruz(b)
 
+    def _vehiculo_aporta_a_cola(self, v: Vehiculo) -> bool:
+        """La cola ya no depende del color: cuenta vehículos detenidos o casi detenidos."""
+        return bool(v.detenido or v.velocidad < 15.0)
+
+    def _proximo_verde_es_ns(self) -> bool | None:
+        """
+        Determina qué eje recibirá el siguiente verde usando el estado ya programado del semáforo.
+        """
+        if self.semaforo.fase == FaseSemaforo.AMARILLO_NS:
+            if self.semaforo.fase_adaptativa_activa and self.semaforo._siguiente_verde_ns is not None:
+                return bool(self.semaforo._siguiente_verde_ns)
+            return False
+        if self.semaforo.fase == FaseSemaforo.AMARILLO_EW:
+            if self.semaforo.fase_adaptativa_activa and self.semaforo._siguiente_verde_ns is not None:
+                return bool(self.semaforo._siguiente_verde_ns)
+            return True
+        return None
+
+    def _capturar_snapshot_cola_preverde(self) -> None:
+        """
+        Guarda la cola del eje que va a recibir verde justo antes del cambio de fase.
+        """
+        proximo_ns = self._proximo_verde_es_ns()
+        if proximo_ns is None:
+            return
+        activos = [v for v in self.vehiculos if not v.cruzo]
+        cola_ns, cola_ew, _, _ = self._esperas_y_colas_por_eje(activos)
+        if proximo_ns:
+            self._cola_snapshot_preverde_ns = float(cola_ns)
+        else:
+            self._cola_snapshot_preverde_ew = float(cola_ew)
+
     def _esperas_y_colas_por_eje(self, activos: List[Vehiculo]) -> tuple[int, int, float, float]:
         cola_ns = sum(
             1
             for v in activos
-            if self._es_grupo_ns(v.direccion) and v.detenido and not self.semaforo.puede_avanzar_ns()
+            if self._es_grupo_ns(v.direccion) and self._vehiculo_aporta_a_cola(v)
         )
         cola_ew = sum(
             1
             for v in activos
-            if not self._es_grupo_ns(v.direccion) and v.detenido and not self.semaforo.puede_avanzar_ew()
+            if not self._es_grupo_ns(v.direccion) and self._vehiculo_aporta_a_cola(v)
         )
         ns_t = [
             v.tiempo_espera
             for v in activos
-            if self._es_grupo_ns(v.direccion) and (v.detenido or v.velocidad < 15)
+            if self._es_grupo_ns(v.direccion) and self._vehiculo_aporta_a_cola(v)
         ]
         ew_t = [
             v.tiempo_espera
             for v in activos
-            if not self._es_grupo_ns(v.direccion) and (v.detenido or v.velocidad < 15)
+            if not self._es_grupo_ns(v.direccion) and self._vehiculo_aporta_a_cola(v)
         ]
         ens = float(sum(ns_t) / len(ns_t)) if ns_t else 0.0
         eew = float(sum(ew_t) / len(ew_t)) if ew_t else 0.0
@@ -539,6 +576,11 @@ class Interseccion:
             self.semaforo.programar_siguiente_verde_ns(
                 siguiente_grupo_es_ns(self._estado_para_politica_fase())
             )
+        if self.semaforo.fase in (FaseSemaforo.AMARILLO_NS, FaseSemaforo.AMARILLO_EW):
+            tiempo_restante = float(config.DURACION_AMARILLO) - float(self.semaforo.tiempo_en_fase)
+            # El snapshot conserva la cola previa al verde para que el difuso vea la demanda real.
+            if tiempo_restante <= dt + 1e-9:
+                self._capturar_snapshot_cola_preverde()
 
         self.semaforo.actualizar(dt)
 
@@ -662,6 +704,17 @@ class Interseccion:
             "longitud_cola": longitud_cola,
             "cola_ns": float(cola_ns),
             "cola_ew": float(cola_ew),
+            # Snapshot de demanda justo antes de entrar al verde; el callback difuso lo usa si existe.
+            "cola_ns_preverde": (
+                float(self._cola_snapshot_preverde_ns)
+                if self._cola_snapshot_preverde_ns is not None
+                else None
+            ),
+            "cola_ew_preverde": (
+                float(self._cola_snapshot_preverde_ew)
+                if self._cola_snapshot_preverde_ew is not None
+                else None
+            ),
             "espera_ns": float(espera_ns),
             "espera_ew": float(espera_ew),
             "fase": self.semaforo.fase,

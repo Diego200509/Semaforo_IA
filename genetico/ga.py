@@ -1,18 +1,20 @@
 """
 Algoritmo genético con **DEAP**: selección por torneo, cruce BLX (`cxBlend`),
-mutación gaussiana por gen y registro de estadísticas vía `eaSimple`.
+mutación gaussiana por gen y registro de estadísticas.
 
 El cromosoma sigue siendo `genetico.cromosoma.Cromosoma`; el mejor individuo
-se obtiene del `HallOfFame`.
+se obtiene del `HallOfFame`. La evaluación usa semillas compartidas por
+generación para que todos los individuos compitan bajo el mismo tráfico.
 """
 
 from __future__ import annotations
 
+import copy
 import random
 from typing import List, Tuple
 
 import numpy as np
-from deap import algorithms, base, creator, tools
+from deap import base, creator, tools
 
 import config
 from genetico.cromosoma import Cromosoma
@@ -50,12 +52,48 @@ def _mut_gauss(ind: list, mu: float, sigma: float, indpb: float) -> tuple:
     return (ind,)
 
 
-def _semilla_evaluacion(individual: list, semilla_base: int) -> int:
-    """Semilla determinista por genoma (estable dentro del proceso)."""
-    acc = 0
-    for x in individual:
-        acc = (acc * 31 + int(float(x) * 1_000_000)) % (2**31 - 1)
-    return semilla_base + acc * 9973 + 13
+def _semillas_compartidas_generacion(
+    semilla_base: int,
+    generacion: int,
+    cantidad: int = 3,
+) -> tuple[int, ...]:
+    """
+    Genera un conjunto fijo de semillas por generación.
+
+    Todos los individuos evaluados en la misma generación usan exactamente estas
+    semillas, de modo que la comparación dependa del controlador y no de "suerte"
+    en el tráfico.
+    """
+    rng = random.Random(semilla_base + 10_007 * generacion + 97)
+    return tuple(rng.randrange(1, 2**31 - 1) for _ in range(max(1, int(cantidad))))
+
+
+def _evaluar_poblacion_generacion(
+    poblacion: list,
+    *,
+    generacion: int,
+    semilla_base: int,
+    escenario_fitness: str | None,
+    multi_escenario: bool | None,
+) -> None:
+    """
+    Evalúa solo individuos inválidos usando el mismo bloque de semillas compartidas.
+    """
+    semillas = _semillas_compartidas_generacion(semilla_base, generacion)
+    invalidos = [ind for ind in poblacion if not ind.fitness.valid]
+    for individual in invalidos:
+        crom = Cromosoma([float(x) for x in individual])
+        fitnesses: list[float] = []
+        for semilla in semillas:
+            fit, _ = evaluar_cromosoma(
+                crom,
+                semilla=semilla,
+                escenario=escenario_fitness,
+                multi_escenario=multi_escenario,
+            )
+            fitnesses.append(float(fit))
+        # Promedio sobre el mismo conjunto compartido: comparación justa dentro de la generación.
+        individual.fitness.values = (sum(fitnesses) / len(fitnesses),)
 
 
 def ejecutar_ga(
@@ -73,17 +111,6 @@ def ejecutar_ga(
 
     _registrar_tipos_deap()
 
-    def evaluar_individuo(individual: list) -> tuple[float, ...]:
-        sem = _semilla_evaluacion(individual, semilla_base)
-        crom = Cromosoma([float(x) for x in individual])
-        fit, _ = evaluar_cromosoma(
-            crom,
-            semilla=sem,
-            escenario=escenario_fitness,
-            multi_escenario=multi_escenario,
-        )
-        return (fit,)
-
     toolbox = base.Toolbox()
     toolbox.register("attr_float", random.random)
     toolbox.register(
@@ -94,7 +121,7 @@ def ejecutar_ga(
         n=Cromosoma.longitud_esperada(),
     )
     toolbox.register("population", tools.initRepeat, list, toolbox.individual)
-    toolbox.register("evaluate", evaluar_individuo)
+    toolbox.register("clone", copy.deepcopy)
     toolbox.register("mate", _mate_blend, alpha=0.35)
     toolbox.register("mutate", _mut_gauss, mu=0.0, sigma=0.08, indpb=config.PROB_MUTACION)
     toolbox.register("select", tools.selTournament, tournsize=3)
@@ -103,17 +130,47 @@ def ejecutar_ga(
     hof = tools.HallOfFame(1)
     stats = tools.Statistics(lambda ind: ind.fitness.values)
     stats.register("max", np.max)
+    logbook = tools.Logbook()
+    logbook.header = ["gen", "nevals", "max"]
 
-    _, logbook = algorithms.eaSimple(
+    _evaluar_poblacion_generacion(
         pop,
-        toolbox,
-        cxpb=config.PROB_CRUCE,
-        mutpb=1.0,
-        ngen=config.GENERACIONES_GA,
-        stats=stats,
-        halloffame=hof,
-        verbose=False,
+        generacion=0,
+        semilla_base=semilla_base,
+        escenario_fitness=escenario_fitness,
+        multi_escenario=multi_escenario,
     )
+    hof.update(pop)
+    record = stats.compile(pop) if stats else {}
+    logbook.record(gen=0, nevals=len(pop), **record)
+
+    for gen in range(1, config.GENERACIONES_GA + 1):
+        offspring = toolbox.select(pop, len(pop))
+        offspring = list(map(toolbox.clone, offspring))
+
+        for hijo1, hijo2 in zip(offspring[::2], offspring[1::2]):
+            if random.random() < config.PROB_CRUCE:
+                toolbox.mate(hijo1, hijo2)
+                del hijo1.fitness.values
+                del hijo2.fitness.values
+
+        for mutante in offspring:
+            toolbox.mutate(mutante)
+            if mutante.fitness.valid:
+                del mutante.fitness.values
+
+        _evaluar_poblacion_generacion(
+            offspring,
+            generacion=gen,
+            semilla_base=semilla_base,
+            escenario_fitness=escenario_fitness,
+            multi_escenario=multi_escenario,
+        )
+
+        pop[:] = offspring
+        hof.update(pop)
+        record = stats.compile(pop) if stats else {}
+        logbook.record(gen=gen, nevals=len(pop), **record)
 
     mejor = Cromosoma([float(x) for x in hof[0]])
     # Gen 0 = población inicial; dejamos una entrada por generación evolutiva.

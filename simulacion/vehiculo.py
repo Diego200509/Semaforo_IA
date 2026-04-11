@@ -76,7 +76,8 @@ class Vehiculo:
         ra = float(especificacion(self.tipo).radio_px)
         rb = float(especificacion(otro.tipo).radio_px)
         extra = float(getattr(config, "GAP_VISUAL_ENTRE_VEHICULOS", 0.0))
-        base = 10.0 + ra + rb + extra
-        # Mayor despeje → más hueco entre vehículos (ocupan más el cruce en el tiempo).
+        base_px = float(getattr(config, "SEPARACION_BASE_CENTROS_PX", 4.0))
+        base = base_px + ra + rb + extra
+        # Mayor despeje → un poco más de hueco (bus/camión).
         fd = max(self.factor_despeje(), otro.factor_despeje())
-        return base * (0.85 + 0.15 * fd)
+        return base * (0.82 + 0.12 * fd)

@@ -236,6 +236,14 @@ Las reglas están listadas en `difuso/reglas.py` (9 reglas, conjunto defendible 
 
 Proyecto modular pensado para **exposición oral**: cada carpeta tiene una responsabilidad clara y comentarios donde la lógica no es obvia.
 
+## Menú gráfico (recomendado)
+
+Ventana con pestañas **Simulación (juego)** y **Reportes y análisis**; cada acción abre una consola nueva con el mismo `main.py` que la CLI.
+
+```bash
+python launcher.py
+```
+
 ## Comandos para ejecutar
 
 Desde la raíz del proyecto (entorno virtual activado). Ver todas las opciones: `python main.py --help`.

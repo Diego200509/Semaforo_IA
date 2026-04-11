@@ -12,14 +12,24 @@ Un futuro adaptador SUMO implementaría la misma interfaz sin tocar difuso/gené
 
 from __future__ import annotations
 
+import math
 from abc import ABC, abstractmethod
-from typing import Any, Callable, Optional
+from typing import Any, Callable, Dict, Optional, Tuple
 
 import config
 from simulacion.escenarios import crear_control_generacion
 from simulacion.interseccion import Interseccion
 from simulacion.semaforo import FaseSemaforo
-from simulacion.vehiculo import DireccionMovimiento
+from simulacion.tipos_trafico import TipoVehiculo, especificacion
+from simulacion.vehiculo import DireccionMovimiento, Vehiculo
+
+
+_NOMBRE_ARCHIVO_POR_TIPO: Dict[TipoVehiculo, str] = {
+    TipoVehiculo.MOTO: "moto",
+    TipoVehiculo.AUTO: "auto",
+    TipoVehiculo.BUS: "bus",
+    TipoVehiculo.CAMION: "camion",
+}
 
 
 def _import_pygame():
@@ -153,8 +163,11 @@ class MotorSimulacionPygame(MotorSimulacionProgramatico):
         self._pg.display.set_caption(config.TITULO_VENTANA)
         self._pantalla = self._pg.display.set_mode((config.ANCHO_VENTANA, config.ALTO_VENTANA))
         self._reloj = self._pg.time.Clock()
-        self._fuente = self._pg.font.SysFont("segoeui", 18)
+        self._fuente_metricas = self._crear_fuente_metricas()
         self._fondo_cache: Any = self._cargar_fondo_opcional()
+        # Bases escaladas por tipo y variantes ya rotadas (clave: tipo, dirección efectiva).
+        self._sprites_base_por_tipo: Dict[TipoVehiculo, Any] | None = None
+        self._sprites_rotados_cache: Dict[Tuple[TipoVehiculo, DireccionMovimiento], Any] = {}
 
     def _cargar_fondo_opcional(self) -> Any:
         """Si existe una imagen en assets/fondos, úsala; si no, fondo plano."""
@@ -171,16 +184,163 @@ class MotorSimulacionPygame(MotorSimulacionProgramatico):
         except self._pg.error:
             return None
 
-    def _cargar_sprite_coche_opcional(self) -> Any:
-        if not config.CARPETA_CARROS.is_dir():
-            return None
-        imgs = sorted(config.CARPETA_CARROS.glob("*.png"))
-        if not imgs:
-            return None
+    def _crear_fuente_metricas(self) -> Any:
+        """Fuente tipo pixel / monoespaciada y negrita para el HUD; legible sobre fondos claros."""
+        pg = self._pg
+        px = int(getattr(config, "HUD_METRICAS_FUENTE_PX", 17))
+        nombres = getattr(
+            config,
+            "HUD_METRICAS_NOMBRES_FUENTE",
+            ("Press Start 2P", "VT323", "Consolas", "Courier New"),
+        )
+        for nombre in nombres:
+            ruta = pg.font.match_font(nombre, bold=True)
+            if ruta:
+                return pg.font.Font(ruta, px)
+        return pg.font.SysFont(["Courier New", "Courier", "Consolas"], px, bold=True)
+
+    def _tamano_caja_sprite_px(self, radio: int) -> int:
+        """Encaja el arte en un cuadrado ~ proporcional al radio lógico del vehículo."""
+        mult = float(getattr(config, "SPRITE_VEHICULO_MULT_RADIO", 4.35))
+        lado_min = int(getattr(config, "SPRITE_VEHICULO_LADO_MIN", 34))
+        return max(lado_min, int(round(mult * float(radio))))
+
+    def _escalar_a_caja(self, surf: Any, lado: int) -> Any:
+        w, h = surf.get_size()
+        if w <= 0 or h <= 0:
+            return surf
+        escala = min(float(lado) / float(w), float(lado) / float(h))
+        nw = max(1, int(round(w * escala)))
+        nh = max(1, int(round(h * escala)))
+        suave = bool(getattr(config, "SPRITE_VEHICULO_ESCALADO_SUAVE", False))
+        if suave:
+            return self._pg.transform.smoothscale(surf, (nw, nh))
+        return self._pg.transform.scale(surf, (nw, nh))
+
+    def _cargar_superficie_archivo(self, ruta: Any) -> Any | None:
+        pg = self._pg
         try:
-            return self._pg.image.load(str(imgs[0])).convert_alpha()
-        except self._pg.error:
+            if str(ruta).lower().endswith(".png"):
+                return pg.image.load(str(ruta)).convert_alpha()
+            return pg.image.load(str(ruta)).convert()
+        except pg.error:
             return None
+
+    def _asegurar_sprites_base_por_tipo(self) -> None:
+        """Carga una vez `assets/carros/<tipo>.png` (o .jpg); si no hay por tipo, usa un único PNG genérico."""
+        if self._sprites_base_por_tipo is not None:
+            return
+        self._sprites_base_por_tipo = {}
+        self._sprites_rotados_cache.clear()
+        carpeta = config.CARPETA_CARROS
+        if not carpeta.is_dir():
+            return
+        bases: Dict[TipoVehiculo, Any] = {}
+        for tipo, nombre in _NOMBRE_ARCHIVO_POR_TIPO.items():
+            surf = None
+            for ext in (".png", ".jpg", ".jpeg"):
+                p = carpeta / f"{nombre}{ext}"
+                if p.is_file():
+                    surf = self._cargar_superficie_archivo(p)
+                    if surf is not None:
+                        break
+            if surf is not None:
+                lado = self._tamano_caja_sprite_px(especificacion(tipo).radio_px)
+                bases[tipo] = self._escalar_a_caja(surf, lado)
+        if bases:
+            self._sprites_base_por_tipo = bases
+            return
+        gen = carpeta / "coche.png"
+        if not gen.is_file():
+            todas = sorted(carpeta.glob("*.png")) + sorted(carpeta.glob("*.jpg"))
+            if not todas:
+                return
+            gen = todas[0]
+        surf_gen = self._cargar_superficie_archivo(gen)
+        if surf_gen is None:
+            return
+        for tipo in TipoVehiculo:
+            lado = self._tamano_caja_sprite_px(especificacion(tipo).radio_px)
+            self._sprites_base_por_tipo[tipo] = self._escalar_a_caja(surf_gen, lado)
+
+    def _render_texto_metrica(self, texto: str, color: tuple, contorno: tuple, grosor: int) -> Any:
+        """Texto con contorno claro (8 vecinos) para leerlo sobre cualquier fondo."""
+        pg = self._pg
+        g = max(1, int(grosor))
+        fg = self._fuente_metricas.render(texto, False, color)
+        w, h = fg.get_size()
+        out = pg.Surface((w + 2 * g, h + 2 * g), pg.SRCALPHA)
+        offsets = (
+            (-g, 0),
+            (g, 0),
+            (0, -g),
+            (0, g),
+            (-g, -g),
+            (g, -g),
+            (-g, g),
+            (g, g),
+        )
+        capa = self._fuente_metricas.render(texto, False, contorno)
+        for dx, dy in offsets:
+            out.blit(capa, (g + dx, g + dy))
+        out.blit(fg, (g, g))
+        return out
+
+    def _dibujar_hud_metricas(self, lineas: list[str]) -> None:
+        """Panel semitransparente + texto negro con contorno blanco."""
+        pg = self._pg
+        color_fg = tuple(getattr(config, "HUD_METRICAS_COLOR", (12, 12, 12)))
+        contorno = tuple(getattr(config, "HUD_METRICAS_CONTORNO", (255, 255, 255)))
+        grosor = int(getattr(config, "HUD_METRICAS_CONTORNO_GROSOR", 1))
+        pad = int(getattr(config, "HUD_PANEL_PADDING", 10))
+        line_gap = 4
+        x0, y0 = 6, 6
+
+        surfs = [self._render_texto_metrica(t, color_fg, contorno, grosor) for t in lineas]
+        w = max((s.get_width() for s in surfs), default=0) + 2 * pad
+        h = (
+            2 * pad
+            + sum(s.get_height() for s in surfs)
+            + line_gap * max(0, len(surfs) - 1)
+        )
+
+        panel = pg.Surface((max(1, w), max(1, h)), pg.SRCALPHA)
+        r, g, b = tuple(getattr(config, "HUD_PANEL_RELLENO", (255, 252, 245)))
+        alpha = int(getattr(config, "HUD_PANEL_ALPHA", 242))
+        alpha = max(0, min(255, alpha))
+        panel.fill((r, g, b, alpha))
+        borde = int(getattr(config, "HUD_PANEL_BORDE_PX", 2))
+        color_borde = tuple(getattr(config, "HUD_PANEL_BORDE_COLOR", (0, 0, 0)))
+        pg.draw.rect(panel, color_borde, panel.get_rect(), width=max(1, borde))
+
+        yy = pad
+        for s in surfs:
+            panel.blit(s, (pad, yy))
+            yy += s.get_height() + line_gap
+
+        self._pantalla.blit(panel, (x0, y0))
+
+    def _angulo_sprite_grados(self, dx: float, dy: float) -> float:
+        """Asume el PNG con el morro hacia arriba (eje -Y pantalla); alinea con (dx, dy)."""
+        return math.degrees(math.atan2(-dx, -dy))
+
+    def _sprite_rotado(self, v: Vehiculo) -> Any | None:
+        self._asegurar_sprites_base_por_tipo()
+        if not self._sprites_base_por_tipo:
+            return None
+        base = self._sprites_base_por_tipo.get(v.tipo)
+        if base is None:
+            return None
+        inter = self.interseccion
+        d_eff = inter.direccion_movimiento_efectiva(v)
+        clave = (v.tipo, d_eff)
+        if clave in self._sprites_rotados_cache:
+            return self._sprites_rotados_cache[clave]
+        dx, dy = inter.vector_movimiento_unitario(v)
+        ang = self._angulo_sprite_grados(dx, dy)
+        rot = self._pg.transform.rotate(base, ang)
+        self._sprites_rotados_cache[clave] = rot
+        return rot
 
     def cerrar(self) -> None:
         self._pg.quit()
@@ -214,7 +374,7 @@ class MotorSimulacionPygame(MotorSimulacionProgramatico):
         )
 
         self._dibujar_semaforos(cx, cy)
-        sprite = self._cargar_sprite_coche_opcional()
+        self._asegurar_sprites_base_por_tipo()
 
         for v in self.interseccion.vehiculos:
             color = (
@@ -223,6 +383,7 @@ class MotorSimulacionPygame(MotorSimulacionProgramatico):
                 in (DireccionMovimiento.HACIA_SUR, DireccionMovimiento.HACIA_NORTE)
                 else config.COLOR_CARRO_EW
             )
+            sprite = self._sprite_rotado(v)
             if sprite:
                 r = sprite.get_rect(center=(int(v.x), int(v.y)))
                 self._pantalla.blit(sprite, r)
@@ -238,10 +399,7 @@ class MotorSimulacionPygame(MotorSimulacionProgramatico):
             f"Atendidos: {int(m['vehiculos_atendidos'])}",
             f"Fase NS: {self.interseccion.semaforo.fase_para_grupo_ns()} | EW: {self.interseccion.semaforo.fase_para_grupo_ew()}",
         ]
-        y0 = 8
-        for i, texto in enumerate(lineas):
-            surf = self._fuente.render(texto, True, config.COLOR_TEXTO)
-            self._pantalla.blit(surf, (10, y0 + i * 22))
+        self._dibujar_hud_metricas(lineas)
 
         pg.display.flip()
 
@@ -263,13 +421,17 @@ class MotorSimulacionPygame(MotorSimulacionProgramatico):
                     return config.COLOR_SEMAFORO_AMARILLO
             return config.COLOR_SEMAFORO_ROJO
 
-        radio = 7
+        radio = int(getattr(config, "SEMAFORO_RADIO_PX", 7))
+        borde = int(getattr(config, "SEMAFORO_BORDE_PX", 2))
+        color_borde = tuple(getattr(config, "COLOR_SEMAFORO_BORDE", (0, 0, 0)))
         offset = 78
         pos_ns = [(cx - offset, cy - offset), (cx + offset, cy + offset)]
         pos_ew = [(cx + offset, cy - offset), (cx - offset, cy + offset)]
         for px, py in pos_ns:
+            pg.draw.circle(self._pantalla, color_borde, (px, py), radio + borde)
             pg.draw.circle(self._pantalla, color_para(True), (px, py), radio)
         for px, py in pos_ew:
+            pg.draw.circle(self._pantalla, color_borde, (px, py), radio + borde)
             pg.draw.circle(self._pantalla, color_para(False), (px, py), radio)
 
     def ejecutar_bucle_visual(

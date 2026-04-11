@@ -11,6 +11,8 @@ CARPETA_ASSETS = RAIZ_PROYECTO / "assets"
 CARPETA_CARROS = CARPETA_ASSETS / "carros"
 CARPETA_SEMAFOROS = CARPETA_ASSETS / "semaforos"
 CARPETA_FONDOS = CARPETA_ASSETS / "fondos"
+# Vehículos (Pygame): en carros/ pon moto.png, auto.png, bus.png, camion.png (o un solo coche.png).
+# Fondo de la ventana: en fondos/ cualquier .png/.jpg (se usa el primero por nombre y se escala a la ventana).
 # Salida de gráficas Matplotlib (evolución GA, comparaciones, etc.).
 CARPETA_GRAFICAS = RAIZ_PROYECTO / "graficas"
 
@@ -32,6 +34,33 @@ OFFSET_CENTRO_GRUPO_CARRIL = 28.0
 FPS = 60
 TITULO_VENTANA = "Proyecto Semáforo IA — Simulación"
 
+# --- Pygame: sprites de vehículos (tamaño en pantalla respecto al radio lógico) ---
+SPRITE_VEHICULO_MULT_RADIO = 4.35
+SPRITE_VEHICULO_LADO_MIN = 34
+# True = suavizado (fotos); False = vecino más cercano (mejor para pixel art).
+SPRITE_VEHICULO_ESCALADO_SUAVE = False
+
+# --- Pygame: panel de métricas (esquina superior izquierda) ---
+HUD_METRICAS_COLOR = (12, 12, 12)
+HUD_METRICAS_CONTORNO = (255, 255, 255)
+HUD_METRICAS_CONTORNO_GROSOR = 1
+HUD_METRICAS_FUENTE_PX = 17
+HUD_PANEL_PADDING = 10
+HUD_PANEL_RELLENO = (255, 252, 245)
+HUD_PANEL_ALPHA = 242
+HUD_PANEL_BORDE_PX = 2
+HUD_PANEL_BORDE_COLOR = (0, 0, 0)
+# Orden de búsqueda (tipos pixel / monoespaciados típicos en Windows).
+HUD_METRICAS_NOMBRES_FUENTE = (
+    "Press Start 2P",
+    "VT323",
+    "Pixeloid Mono",
+    "Silkscreen",
+    "Fixedsys",
+    "Consolas",
+    "Courier New",
+)
+
 # --- Colores RGB (útiles para Pygame y gráficas) ---
 COLOR_FONDO = (32, 36, 48)
 COLOR_CALLE = (48, 52, 62)
@@ -42,6 +71,9 @@ COLOR_TEXTO = (230, 230, 235)
 COLOR_SEMAFORO_ROJO = (200, 50, 50)
 COLOR_SEMAFORO_AMARILLO = (220, 200, 60)
 COLOR_SEMAFORO_VERDE = (80, 200, 100)
+COLOR_SEMAFORO_BORDE = (0, 0, 0)
+SEMAFORO_RADIO_PX = 7
+SEMAFORO_BORDE_PX = 2
 
 # --- Intersección y tráfico ---
 # Capacidad de referencia para normalizar "densidad" (vehículos presentes / este valor).
@@ -52,8 +84,16 @@ MAX_VEHICULOS_EN_MAPA = 30
 INTERVALO_SPAWN_BASE = 1.8
 # Velocidad base de movimiento (píxeles por segundo) en calle libre.
 VELOCIDAD_BASE = 85.0
-# Hueco extra entre centros de vehículos en cola (además de radios), para evitar solapamiento visual.
-GAP_VISUAL_ENTRE_VEHICULOS = 8.0
+# Hueco extra entre centros de vehículos en cola (además de radios); más bajo = cola más junta.
+GAP_VISUAL_ENTRE_VEHICULOS = 2.5
+# Suma mínima en px además de los radios (separación entre centros); bajar acerca más los coches en cola.
+SEPARACION_BASE_CENTROS_PX = 4.0
+# Misma fila lógica aunque el guiado lateral aún no los haya alineado del todo (< separación recto/giro ~18 px).
+TOLERANCIA_MISMO_CORREDOR_PX = 16.0
+# 0–1: corrección de separación en cola por fotograma (más alto = cierra huecos antes).
+SEPARACION_COLA_SUAVIDAD = 0.58
+# Paso máx. (px) del refuerzo longitudinal tras la cola (evita solapes sin empuje 2D del cruce).
+SEPARACION_REFUERZO_LONG_MAX_PX = 5.5
 # Referencia ~ mitad del ancho del cruce dibujado; sirve para colocar la línea de parada (no es el punto de desaparición).
 DISTANCIA_SALIDA_CRUCE = 52.0
 # Distancia desde el centro hasta la línea de parada (píxeles en el eje de marcha). Debe ser mayor que la mitad

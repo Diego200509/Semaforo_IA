@@ -315,6 +315,14 @@ class Interseccion:
             return 1.0, 0.0
         return -1.0, 0.0
 
+    def direccion_movimiento_efectiva(self, v: Vehiculo) -> DireccionMovimiento:
+        """Sentido de marcha actual (recta o ya en giro); útil para orientar sprites en la vista."""
+        return self._direccion_movimiento_efectiva(v)
+
+    def vector_movimiento_unitario(self, v: Vehiculo) -> Tuple[float, float]:
+        """Vector unitario (dx, dy) del movimiento efectivo, mismo criterio que la simulación."""
+        return self._vector_direccion(v)
+
     def _direccion_para_guiado(self, v: Vehiculo) -> DireccionMovimiento:
         return v.direccion_movimiento if v.direccion_movimiento is not None else v.direccion
 
@@ -357,17 +365,27 @@ class Interseccion:
         else:
             v.y += k * (ty - v.y)
 
+    def _mismo_corredor_efectivo(self, a: Vehiculo, b: Vehiculo) -> bool:
+        """Misma marcha efectiva (SUR/NORTE/ESTE/OESTE) y misma banda lateral.
+
+        Eje lateral: X para flujos norte–sur, Y para flujos este–oeste (misma regla en los cuatro sentidos).
+        """
+        if self._direccion_movimiento_efectiva(a) != self._direccion_movimiento_efectiva(b):
+            return False
+        tol = float(getattr(config, "TOLERANCIA_MISMO_CORREDOR_PX", 12.0))
+        d = self._direccion_movimiento_efectiva(a)
+        if d in (DireccionMovimiento.HACIA_SUR, DireccionMovimiento.HACIA_NORTE):
+            return abs(a.x - b.x) < tol
+        return abs(a.y - b.y) < tol
+
     def _vehiculo_delante_misma_aproximacion(self, v: Vehiculo) -> Vehiculo | None:
-        if v.direccion_movimiento is not None:
-            return None
+        """Líder inmediato en el mismo corredor virtual (todos los sentidos y también en giro)."""
         pv = self._progreso_en_linea(v)
         candidatos: List[Vehiculo] = []
         for otro in self.vehiculos:
             if otro is v or otro.cruzo:
                 continue
-            if otro.direccion != v.direccion or otro.carril != v.carril or otro.maniobra != v.maniobra:
-                continue
-            if otro.direccion_movimiento is not None:
+            if not self._mismo_corredor_efectivo(v, otro):
                 continue
             po = self._progreso_en_linea(otro)
             if po > pv + 1e-3:
@@ -377,12 +395,12 @@ class Interseccion:
         return min(candidatos, key=lambda o: self._progreso_en_linea(o))
 
     def _aplicar_separacion_colas(self) -> None:
-        """Evita solapamiento visual: empuja hacia atrás al que va detrás si quedó demasiado cerca."""
-        for _ in range(3):
+        """Separa colas en todos los corredores (N-S y E-O): acerca al detrás hacia la distancia mínima."""
+        beta = float(getattr(config, "SEPARACION_COLA_SUAVIDAD", 0.48))
+        beta = max(0.15, min(1.0, beta))
+        for _ in range(5):
             activos = [v for v in self.vehiculos if not v.cruzo]
             for v in sorted(activos, key=lambda x: self._progreso_en_linea(x)):
-                if v.direccion_movimiento is not None:
-                    continue
                 delante = self._vehiculo_delante_misma_aproximacion(v)
                 if delante is None:
                     continue
@@ -394,13 +412,61 @@ class Interseccion:
                     continue
                 if dist < 1e-6:
                     fx, fy = self._vector_direccion(v)
-                    v.x = delante.x - fx * sep
-                    v.y = delante.y - fy * sep
+                    tx = delante.x - fx * sep
+                    ty = delante.y - fy * sep
                 else:
                     f = sep / dist
-                    v.x = delante.x + dx * f
-                    v.y = delante.y + dy * f
+                    tx = delante.x + dx * f
+                    ty = delante.y + dy * f
+                v.x += beta * (tx - v.x)
+                v.y += beta * (ty - v.y)
                 self._clamp_a_cruz(v)
+
+    def _refinar_separacion_longitudinal(self) -> None:
+        """Corrige solapes residuales en cola en cualquier sentido (empuje solo al de atrás, hacia el líder)."""
+        cap = float(getattr(config, "SEPARACION_REFUERZO_LONG_MAX_PX", 5.5))
+        for _ in range(4):
+            activos = [v for v in self.vehiculos if not v.cruzo]
+            for v in sorted(activos, key=lambda x: self._progreso_en_linea(x)):
+                delante = self._vehiculo_delante_misma_aproximacion(v)
+                if delante is None:
+                    continue
+                sep = v.separacion_respecto(delante)
+                dx = v.x - delante.x
+                dy = v.y - delante.y
+                dist = math.hypot(dx, dy)
+                if dist >= sep - 0.35 or dist < 1e-9:
+                    continue
+                ux, uy = dx / dist, dy / dist
+                falta = sep - dist
+                step = min(falta + 0.25, cap)
+                v.x += ux * step
+                v.y += uy * step
+                self._clamp_a_cruz(v)
+
+    def _separar_solapes_en_cruce(self) -> None:
+        """Zona del cruce: separa solo pares de corredores distintos (cualquier cruce de trayectorias)."""
+        r = float(config.RADIO_ZONA_CRUCE_INTERIOR) * 1.4
+        activos = [v for v in self.vehiculos if not v.cruzo and self._distancia_al_centro(v) < r]
+        for _ in range(4):
+            for i, a in enumerate(activos):
+                for b in activos[i + 1 :]:
+                    if self._mismo_corredor_efectivo(a, b):
+                        continue
+                    sep = 0.5 * (a.separacion_respecto(b) + b.separacion_respecto(a))
+                    dx = b.x - a.x
+                    dy = b.y - a.y
+                    dist = math.hypot(dx, dy)
+                    if dist >= sep or dist < 1e-9:
+                        continue
+                    push = 0.45 * (sep - dist) / 2.0
+                    ux, uy = dx / dist, dy / dist
+                    a.x -= ux * push
+                    a.y -= uy * push
+                    b.x += ux * push
+                    b.y += uy * push
+                    self._clamp_a_cruz(a)
+                    self._clamp_a_cruz(b)
 
     def _esperas_y_colas_por_eje(self, activos: List[Vehiculo]) -> tuple[int, int, float, float]:
         cola_ns = sum(
@@ -482,9 +548,9 @@ class Interseccion:
                 dist = math.hypot(v.x - delante.x, v.y - delante.y)
                 if dist < separacion:
                     objetivo_vel = 0.0
-                elif dist < separacion + 22.0:
-                    objetivo_vel = min(objetivo_vel, max(0.0, (dist - separacion) * 4.5))
-                elif dist < separacion * 2.2:
+                elif dist < separacion + 14.0:
+                    objetivo_vel = min(objetivo_vel, max(0.0, (dist - separacion) * 5.2))
+                elif dist < separacion * 1.72:
                     objetivo_vel = min(objetivo_vel, delante.velocidad)
 
             if self._puede_pasar(v) and self._cruzo_linea_parada_hacia_centro(v):
@@ -522,7 +588,11 @@ class Interseccion:
             v.detenido = v.velocidad < 1.0
             v.actualizar_espera(dt)
 
+        # Cadena común para los cuatro brazos: cola suave → refuerzo longitudinal → cruces → refuerzo otra vez
         self._aplicar_separacion_colas()
+        self._refinar_separacion_longitudinal()
+        self._separar_solapes_en_cruce()
+        self._refinar_separacion_longitudinal()
 
         self.vehiculos = [v for v in self.vehiculos if not v.cruzo]
 

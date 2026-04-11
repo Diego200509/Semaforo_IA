@@ -100,10 +100,14 @@ DISTANCIA_SALIDA_CRUCE = 52.0
 # del cuadro central en la vista (entorno.dibujar usa ancho_calle=110 → mitad 55); si es menor, el coche frena
 # dentro del recuadro oscuro del cruce.
 DISTANCIA_PARADA_ANTE_SEMAFORO = float(DISTANCIA_SALIDA_CRUCE) + 16.0
-# Mismo margen que el spawn: el coche se retira al llegar al borde opuesto y se ve todo el tramo de salida.
+# Distancia del borde de la ventana donde aparecen los vehículos (spawn).
 MARGEN_BORDE_VEHICULO = 120.0
+# Distancia del borde (desde el centro del vehículo) para retirarlo del mapa. Menor = casi al borde visible.
+MARGEN_RETIRO_VENTANA = 28.0
 
 # --- Fase 2: giros, tipos, carriles, fase adaptativa, GA multi-escenario ---
+# True: solo trayectoria recta (sin giros ni carril de giro). False: usa PROB_MANIOBRA_* y UMBRAL_INICIO_GIRO_CRUCE.
+VEHICULOS_SOLO_RECTO = True
 USA_FASE_ADAPTATIVA = True
 UMBRAL_INICIO_GIRO_CRUCE = 44.0
 PROB_MANIOBRA_RECTO = 0.58

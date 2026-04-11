@@ -1,5 +1,6 @@
 """
-Modelo de intersección: varios carriles, tipos de vehículo, giros y fase adaptativa (Fase 2).
+Modelo de intersección: varios carriles, tipos de vehículo, fase adaptativa (Fase 2).
+Los giros se omiten si `config.VEHICULOS_SOLO_RECTO` es True.
 """
 
 from __future__ import annotations
@@ -22,6 +23,10 @@ from simulacion.vehiculo import (
 
 if TYPE_CHECKING:
     from simulacion.escenarios import ControlGeneracionTrafico, PerfilGeneracion
+
+
+def _vehiculos_solo_recto() -> bool:
+    return bool(getattr(config, "VEHICULOS_SOLO_RECTO", True))
 
 
 class Interseccion:
@@ -186,6 +191,8 @@ class Interseccion:
         return v.x < px
 
     def _direccion_movimiento_efectiva(self, v: Vehiculo) -> DireccionMovimiento:
+        if _vehiculos_solo_recto():
+            return v.direccion
         if v.direccion_movimiento is not None:
             return v.direccion_movimiento
         return v.direccion
@@ -198,6 +205,8 @@ class Interseccion:
         return self._distancia_al_centro(v) < float(config.RADIO_ZONA_CRUCE_INTERIOR)
 
     def _intentar_iniciar_giro(self, v: Vehiculo) -> None:
+        if _vehiculos_solo_recto():
+            return
         if v.maniobra == Maniobra.RECTO:
             return
         if not v.ingreso_cruce_autorizado or v.direccion_movimiento is not None:
@@ -208,7 +217,7 @@ class Interseccion:
         v.carril = CARRIL_PRINCIPAL_RECTO
 
     def _ha_completado_cruce(self, v: Vehiculo) -> bool:
-        m = float(config.MARGEN_BORDE_VEHICULO)
+        m = float(getattr(config, "MARGEN_RETIRO_VENTANA", config.MARGEN_BORDE_VEHICULO))
         d = self._direccion_movimiento_efectiva(v)
         if d == DireccionMovimiento.HACIA_SUR:
             return v.y >= float(config.ALTO_VENTANA) - m
@@ -262,8 +271,12 @@ class Interseccion:
             return
         dire = self._rng.choices(self._dirs_spawn, weights=self._pesos_spawn, k=1)[0]
         margen = int(config.MARGEN_BORDE_VEHICULO)
-        maniobra = self._elegir_maniobra_spawn()
-        carril = carril_para_maniobra(maniobra)
+        if _vehiculos_solo_recto():
+            maniobra = Maniobra.RECTO
+            carril = CARRIL_PRINCIPAL_RECTO
+        else:
+            maniobra = self._elegir_maniobra_spawn()
+            carril = carril_para_maniobra(maniobra)
         lax, lay = offset_spawn_lateral(dire, carril)
         j = self._rng.uniform(-4.0, 4.0)
         if dire == DireccionMovimiento.HACIA_SUR:
@@ -316,7 +329,7 @@ class Interseccion:
         return -1.0, 0.0
 
     def direccion_movimiento_efectiva(self, v: Vehiculo) -> DireccionMovimiento:
-        """Sentido de marcha actual (recta o ya en giro); útil para orientar sprites en la vista."""
+        """Sentido de marcha efectivo (con giros solo si `VEHICULOS_SOLO_RECTO` es False)."""
         return self._direccion_movimiento_efectiva(v)
 
     def vector_movimiento_unitario(self, v: Vehiculo) -> Tuple[float, float]:

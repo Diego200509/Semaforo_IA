@@ -35,6 +35,8 @@ class PerfilEntrenamiento:
     generaciones_ga: int
     semillas_compartidas_por_generacion: int
     duracion_evaluacion_fitness: float
+    prob_mutacion_ga: float
+    sigma_mutacion_ga: float
     archivo_mejor_cromosoma: Path
     archivo_banco_cromosomas: Path
     archivo_grafica_evolucion: Path
@@ -48,10 +50,13 @@ PERFILES_ENTRENAMIENTO = {
     "prueba": PerfilEntrenamiento(
         clave="prueba",
         etiqueta_ui="PRUEBA",
-        poblacion_ga=10,
-        generaciones_ga=6,
+        # Un poco mas de poblacion y generaciones para evitar curvas planas sin disparar el tiempo.
+        poblacion_ga=14,
+        generaciones_ga=10,
         semillas_compartidas_por_generacion=2,
         duracion_evaluacion_fitness=45.0,
+        prob_mutacion_ga=0.16,
+        sigma_mutacion_ga=0.10,
         archivo_mejor_cromosoma=RAIZ_PROYECTO / "cromosoma_prueba.json",
         archivo_banco_cromosomas=RAIZ_PROYECTO / "banco_prueba.json",
         archivo_grafica_evolucion=CARPETA_GRAFICAS / "evolucion_fitness_prueba.png",
@@ -66,6 +71,8 @@ PERFILES_ENTRENAMIENTO = {
         generaciones_ga=18,
         semillas_compartidas_por_generacion=3,
         duracion_evaluacion_fitness=120.0,
+        prob_mutacion_ga=0.12,
+        sigma_mutacion_ga=0.08,
         archivo_mejor_cromosoma=RAIZ_PROYECTO / "cromosoma_final.json",
         archivo_banco_cromosomas=RAIZ_PROYECTO / "banco_final.json",
         archivo_grafica_evolucion=CARPETA_GRAFICAS / "evolucion_fitness_final.png",

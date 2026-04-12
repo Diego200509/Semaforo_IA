@@ -103,6 +103,13 @@ def _evaluar_poblacion_generacion(
         individual.fitness.values = (sum(fitnesses) / len(fitnesses),)
 
 
+def _cantidad_elites(tamano_poblacion: int) -> int:
+    """
+    Limita el elitismo configurado para que siempre sea compatible con la población actual.
+    """
+    return max(0, min(int(config.ELITISMO), int(tamano_poblacion)))
+
+
 def ejecutar_ga(
     semilla_base: int | None = None,
     escenario_fitness: str | None = None,
@@ -132,7 +139,14 @@ def ejecutar_ga(
     toolbox.register("population", tools.initRepeat, list, toolbox.individual)
     toolbox.register("clone", copy.deepcopy)
     toolbox.register("mate", _mate_blend, alpha=0.35)
-    toolbox.register("mutate", _mut_gauss, mu=0.0, sigma=0.08, indpb=config.PROB_MUTACION)
+    # La mutacion tambien depende del perfil para que PRUEBA explore mas sin tocar FINAL.
+    toolbox.register(
+        "mutate",
+        _mut_gauss,
+        mu=0.0,
+        sigma=perfil_cfg.sigma_mutacion_ga,
+        indpb=perfil_cfg.prob_mutacion_ga,
+    )
     toolbox.register("select", tools.selTournament, tournsize=3)
 
     pop = toolbox.population(n=perfil_cfg.poblacion_ga)
@@ -156,7 +170,11 @@ def ejecutar_ga(
 
     for gen in range(1, perfil_cfg.generaciones_ga + 1):
         print(f"Generación {gen}/{perfil_cfg.generaciones_ga} [{perfil_cfg.etiqueta_ui}]")
-        offspring = toolbox.select(pop, len(pop))
+        # Elitismo real: estos individuos pasan intactos a la siguiente generación.
+        n_elites = _cantidad_elites(len(pop))
+        elites = list(map(toolbox.clone, tools.selBest(pop, n_elites)))
+
+        offspring = toolbox.select(pop, len(pop) - n_elites)
         offspring = list(map(toolbox.clone, offspring))
 
         for hijo1, hijo2 in zip(offspring[::2], offspring[1::2]):
@@ -179,10 +197,10 @@ def ejecutar_ga(
             multi_escenario=multi_escenario,
         )
 
-        pop[:] = offspring
+        pop[:] = elites + offspring
         hof.update(pop)
         record = stats.compile(pop) if stats else {}
-        logbook.record(gen=gen, nevals=len(pop), **record)
+        logbook.record(gen=gen, nevals=len(offspring), **record)
 
     mejor = Cromosoma([float(x) for x in hof[0]])
     # Gen 0 = población inicial; dejamos una entrada por generación evolutiva.

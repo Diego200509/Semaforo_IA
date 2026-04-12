@@ -82,6 +82,7 @@ class MotorSimulacionProgramatico(MotorSimulacion):
         duracion_planeada: float | None = None,
         verbose_escenario: bool = False,
         fase_adaptativa: bool | None = None,
+        perfil_entrenamiento: str | None = None,
     ) -> None:
         esc = (escenario or config.ESCENARIO_POR_DEFECTO).strip().lower()
         if duracion_planeada is not None:
@@ -96,6 +97,7 @@ class MotorSimulacionProgramatico(MotorSimulacion):
             control_trafico=control,
             verbose_escenario=verbose_escenario,
             fase_adaptativa=fase_adaptativa,
+            perfil_entrenamiento=perfil_entrenamiento,
         )
         self.interseccion.configurar_modo_tiempo_fijo(modo_tiempo_fijo)
         self._callback = callback_tiempo_verde
@@ -149,6 +151,7 @@ class MotorSimulacionPygame(MotorSimulacionProgramatico):
         duracion_planeada: float | None = None,
         verbose_escenario: bool = False,
         fase_adaptativa: bool | None = None,
+        perfil_entrenamiento: str | None = None,
     ) -> None:
         super().__init__(
             semilla=semilla,
@@ -158,6 +161,7 @@ class MotorSimulacionPygame(MotorSimulacionProgramatico):
             duracion_planeada=duracion_planeada,
             verbose_escenario=verbose_escenario,
             fase_adaptativa=fase_adaptativa,
+            perfil_entrenamiento=perfil_entrenamiento,
         )
         self._pg = _import_pygame()
         self._pg.init()

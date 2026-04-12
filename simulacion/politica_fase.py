@@ -1,17 +1,25 @@
-"""Decisión del siguiente grupo en verde (Fase 2)."""
+"""Decision del siguiente grupo en verde (Fase 2)."""
 
 from __future__ import annotations
 
 from typing import Mapping
 
+import config
+
 
 def siguiente_grupo_es_ns(
     estado: Mapping[str, float | bool | int],
     *,
-    peso_cola: float = 1.0,
-    peso_espera: float = 0.08,
-    umbral_empate: float = 0.75,
+    perfil_entrenamiento: str | None = None,
+    peso_cola: float | None = None,
+    peso_espera: float | None = None,
+    umbral_empate: float | None = None,
 ) -> bool:
+    params = config.obtener_parametros_politica_fase(perfil_entrenamiento)
+    peso_cola = float(params["peso_cola"] if peso_cola is None else peso_cola)
+    peso_espera = float(params["peso_espera"] if peso_espera is None else peso_espera)
+    umbral_empate = float(params["umbral_empate"] if umbral_empate is None else umbral_empate)
+
     cn = float(estado.get("cola_ns", 0) or 0)
     ce = float(estado.get("cola_ew", 0) or 0)
     en = float(estado.get("espera_promedio_ns", 0) or 0)

@@ -97,6 +97,7 @@ def _evaluar_poblacion_generacion(
                 duracion=perfil_cfg.duracion_evaluacion_fitness,
                 escenario=escenario_fitness,
                 multi_escenario=multi_escenario,
+                perfil_entrenamiento=perfil_cfg.clave,
             )
             fitnesses.append(float(fit))
         # Promedio sobre el mismo conjunto compartido: comparación justa dentro de la generación.

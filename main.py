@@ -123,6 +123,7 @@ def modo_simulacion_visual(
         duracion_planeada=_duracion_planeada_visual(escenario),
         verbose_escenario=verbose_escenario,
         fase_adaptativa=fase_adaptativa,
+        perfil_entrenamiento=perfil_cfg.clave,
     )
     motor.reiniciar(semilla=config.SEMILLA_ALEATORIA)
     print("Ventana gráfica: cierra la ventana o pulsa ESC para salir.")
@@ -177,6 +178,7 @@ def modo_simulacion_programatica(
         duracion_planeada=segundos,
         verbose_escenario=verbose_escenario,
         fase_adaptativa=fase_adaptativa,
+        perfil_entrenamiento=perfil_cfg.clave,
     )
     motor.reiniciar(semilla=config.SEMILLA_ALEATORIA)
     t = 0.0

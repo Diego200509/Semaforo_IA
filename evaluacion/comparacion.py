@@ -81,6 +81,7 @@ def _simular_fijo(
     dt: float,
     escenario: str,
     duracion_planeada: float | None = None,
+    perfil_entrenamiento: str | None = None,
 ) -> dict:
     dur_p = float(duracion_planeada if duracion_planeada is not None else duracion)
     motor = MotorSimulacionProgramatico(
@@ -89,6 +90,7 @@ def _simular_fijo(
         callback_tiempo_verde=None,
         escenario=escenario,
         duracion_planeada=dur_p,
+        perfil_entrenamiento=perfil_entrenamiento,
     )
     motor.reiniciar(semilla=semilla)
     t = 0.0
@@ -105,6 +107,7 @@ def _simular_difuso(
     control: ControladorDifuso,
     escenario: str,
     duracion_planeada: float | None = None,
+    perfil_entrenamiento: str | None = None,
 ) -> dict:
     dur_p = float(duracion_planeada if duracion_planeada is not None else duracion)
     motor = MotorSimulacionProgramatico(
@@ -114,6 +117,7 @@ def _simular_difuso(
         escenario=escenario,
         duracion_planeada=dur_p,
         fase_adaptativa=True,
+        perfil_entrenamiento=perfil_entrenamiento,
     )
     motor.reiniciar(semilla=semilla)
     t = 0.0
@@ -138,13 +142,13 @@ def ejecutar_comparacion(
 
     resultados: List[ResultadoEscenario] = []
 
-    m_fijo = _simular_fijo(semilla, duracion, dt, esc, duracion)
+    m_fijo = _simular_fijo(semilla, duracion, dt, esc, duracion, perfil_entrenamiento)
     resultados.append(
         ResultadoEscenario("Tiempo fijo", m_fijo, coste_desde_metricas(m_fijo))
     )
 
     ctrl_base = ControladorDifuso(parametros_por_defecto())
-    m_dif = _simular_difuso(semilla, duracion, dt, ctrl_base, esc, duracion)
+    m_dif = _simular_difuso(semilla, duracion, dt, ctrl_base, esc, duracion, perfil_entrenamiento)
     resultados.append(
         ResultadoEscenario("Difuso (base)", m_dif, coste_desde_metricas(m_dif))
     )
@@ -153,7 +157,7 @@ def ejecutar_comparacion(
     if ruta_crom.is_file():
         crom = Cromosoma.cargar_json(ruta_crom)
         ctrl_opt = ControladorDifuso(crom.decodificar())
-        m_opt = _simular_difuso(semilla, duracion, dt, ctrl_opt, esc, duracion)
+        m_opt = _simular_difuso(semilla, duracion, dt, ctrl_opt, esc, duracion, perfil_entrenamiento)
         resultados.append(
             ResultadoEscenario("Difuso + GA", m_opt, coste_desde_metricas(m_opt))
         )
@@ -181,7 +185,7 @@ def ejecutar_comparacion_promedios_multisemilla(
 
     mats_fijo: List[dict] = []
     for s in semillas:
-        mats_fijo.append(_simular_fijo(s, duracion, dt, esc, duracion))
+        mats_fijo.append(_simular_fijo(s, duracion, dt, esc, duracion, perfil_entrenamiento))
     costes_f = [coste_desde_metricas(m) for m in mats_fijo]
     salida.append(
         ResultadoPromedioEstrategia(
@@ -195,7 +199,7 @@ def ejecutar_comparacion_promedios_multisemilla(
     mats_base: List[dict] = []
     ctrl_base = ControladorDifuso(parametros_por_defecto())
     for s in semillas:
-        mats_base.append(_simular_difuso(s, duracion, dt, ctrl_base, esc, duracion))
+        mats_base.append(_simular_difuso(s, duracion, dt, ctrl_base, esc, duracion, perfil_entrenamiento))
     costes_b = [coste_desde_metricas(m) for m in mats_base]
     salida.append(
         ResultadoPromedioEstrategia(
@@ -212,7 +216,7 @@ def ejecutar_comparacion_promedios_multisemilla(
         ctrl_opt = ControladorDifuso(crom.decodificar())
         mats_ga: List[dict] = []
         for s in semillas:
-            mats_ga.append(_simular_difuso(s, duracion, dt, ctrl_opt, esc, duracion))
+            mats_ga.append(_simular_difuso(s, duracion, dt, ctrl_opt, esc, duracion, perfil_entrenamiento))
         costes_g = [coste_desde_metricas(m) for m in mats_ga]
         salida.append(
             ResultadoPromedioEstrategia(
@@ -247,17 +251,23 @@ def metricas_promedio_por_escenario_y_estrategia(
 
     for esc in escenarios:
         out[esc] = {}
-        mats_fijo = [_simular_fijo(s, duracion, dt, esc, duracion) for s in semillas]
+        mats_fijo = [_simular_fijo(s, duracion, dt, esc, duracion, perfil_entrenamiento) for s in semillas]
         out[esc]["Tiempo fijo"] = promediar_metricas(mats_fijo)
 
         ctrl_base = ControladorDifuso(parametros_por_defecto())
-        mats_b = [_simular_difuso(s, duracion, dt, ctrl_base, esc, duracion) for s in semillas]
+        mats_b = [
+            _simular_difuso(s, duracion, dt, ctrl_base, esc, duracion, perfil_entrenamiento)
+            for s in semillas
+        ]
         out[esc]["Difuso (base)"] = promediar_metricas(mats_b)
 
         if ruta_crom.is_file():
             crom = Cromosoma.cargar_json(ruta_crom)
             ctrl_opt = ControladorDifuso(crom.decodificar())
-            mats_g = [_simular_difuso(s, duracion, dt, ctrl_opt, esc, duracion) for s in semillas]
+            mats_g = [
+                _simular_difuso(s, duracion, dt, ctrl_opt, esc, duracion, perfil_entrenamiento)
+                for s in semillas
+            ]
             out[esc]["Difuso + GA"] = promediar_metricas(mats_g)
 
     return out

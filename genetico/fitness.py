@@ -75,6 +75,7 @@ def _simular_un_escenario(
     escenario: str,
     duracion: float,
     dt: float,
+    perfil_entrenamiento: str | None = None,
 ) -> Tuple[float, dict]:
     control = ControladorDifuso(cromosoma.decodificar())
     motor = MotorSimulacionProgramatico(
@@ -84,6 +85,7 @@ def _simular_un_escenario(
         escenario=escenario,
         duracion_planeada=duracion,
         fase_adaptativa=True,
+        perfil_entrenamiento=perfil_entrenamiento,
     )
     motor.reiniciar(semilla=semilla)
 
@@ -103,6 +105,7 @@ def evaluar_cromosoma(
     dt: float | None = None,
     escenario: str | None = None,
     multi_escenario: bool | None = None,
+    perfil_entrenamiento: str | None = None,
 ) -> tuple[float, dict]:
     """
     Ejecuta simulación(es) con el controlador parametrizado por `cromosoma`.
@@ -131,10 +134,24 @@ def evaluar_cromosoma(
         for i, esc in enumerate(escenarios):
             w = float(pesos[i])
             semi = _semilla_escenario(semilla, esc)
-            fit, ultimo_m = _simular_un_escenario(cromosoma, semi, esc, duracion, dt)
+            fit, ultimo_m = _simular_un_escenario(
+                cromosoma,
+                semi,
+                esc,
+                duracion,
+                dt,
+                perfil_entrenamiento=perfil_entrenamiento,
+            )
             acc += fit * w
             wsum += w
         return acc / max(wsum, 1e-9), ultimo_m
 
     esc = escenario if escenario is not None else config.ESCENARIO_ENTRENAMIENTO_GA
-    return _simular_un_escenario(cromosoma, semilla, esc, duracion, dt)
+    return _simular_un_escenario(
+        cromosoma,
+        semilla,
+        esc,
+        duracion,
+        dt,
+        perfil_entrenamiento=perfil_entrenamiento,
+    )

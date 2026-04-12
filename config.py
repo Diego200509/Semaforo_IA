@@ -37,6 +37,9 @@ class PerfilEntrenamiento:
     duracion_evaluacion_fitness: float
     prob_mutacion_ga: float
     sigma_mutacion_ga: float
+    peso_cola_fase: float
+    peso_espera_fase: float
+    umbral_empate_fase: float
     archivo_mejor_cromosoma: Path
     archivo_banco_cromosomas: Path
     archivo_grafica_evolucion: Path
@@ -46,6 +49,11 @@ class PerfilEntrenamiento:
 
 
 PERFIL_ENTRENAMIENTO_POR_DEFECTO = "final"
+# Politica de fase adaptativa: cola pesa mas y espera sirve como corrector suave.
+PESO_COLA_FASE = 1.0
+PESO_ESPERA_FASE = 0.08
+UMBRAL_EMPATE_FASE = 0.75
+
 PERFILES_ENTRENAMIENTO = {
     "prueba": PerfilEntrenamiento(
         clave="prueba",
@@ -57,6 +65,9 @@ PERFILES_ENTRENAMIENTO = {
         duracion_evaluacion_fitness=45.0,
         prob_mutacion_ga=0.16,
         sigma_mutacion_ga=0.10,
+        peso_cola_fase=PESO_COLA_FASE,
+        peso_espera_fase=PESO_ESPERA_FASE,
+        umbral_empate_fase=UMBRAL_EMPATE_FASE,
         archivo_mejor_cromosoma=RAIZ_PROYECTO / "cromosoma_prueba.json",
         archivo_banco_cromosomas=RAIZ_PROYECTO / "banco_prueba.json",
         archivo_grafica_evolucion=CARPETA_GRAFICAS / "evolucion_fitness_prueba.png",
@@ -73,6 +84,9 @@ PERFILES_ENTRENAMIENTO = {
         duracion_evaluacion_fitness=120.0,
         prob_mutacion_ga=0.12,
         sigma_mutacion_ga=0.08,
+        peso_cola_fase=PESO_COLA_FASE,
+        peso_espera_fase=PESO_ESPERA_FASE,
+        umbral_empate_fase=UMBRAL_EMPATE_FASE,
         archivo_mejor_cromosoma=RAIZ_PROYECTO / "cromosoma_final.json",
         archivo_banco_cromosomas=RAIZ_PROYECTO / "banco_final.json",
         archivo_grafica_evolucion=CARPETA_GRAFICAS / "evolucion_fitness_final.png",
@@ -93,6 +107,18 @@ def obtener_perfil_entrenamiento(perfil: str | None = None) -> PerfilEntrenamien
         validos = ", ".join(sorted(PERFILES_ENTRENAMIENTO))
         raise ValueError(f"Perfil de entrenamiento no válido: {perfil}. Use: {validos}")
     return PERFILES_ENTRENAMIENTO[clave]
+
+
+def obtener_parametros_politica_fase(perfil: str | None = None) -> dict[str, float]:
+    """
+    Devuelve los pesos de la politica de fase para el perfil solicitado.
+    """
+    perfil_cfg = obtener_perfil_entrenamiento(perfil)
+    return {
+        "peso_cola": float(perfil_cfg.peso_cola_fase),
+        "peso_espera": float(perfil_cfg.peso_espera_fase),
+        "umbral_empate": float(perfil_cfg.umbral_empate_fase),
+    }
 
 
 # --- Ventana Pygame (simulación visual) ---

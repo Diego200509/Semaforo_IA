@@ -41,6 +41,7 @@ class Interseccion:
         control_trafico: Optional["ControlGeneracionTrafico"] = None,
         verbose_escenario: bool = False,
         fase_adaptativa: bool | None = None,
+        perfil_entrenamiento: str | None = None,
     ) -> None:
         self.centro_x = config.ANCHO_VENTANA // 2
         self.centro_y = config.ALTO_VENTANA // 2
@@ -60,6 +61,7 @@ class Interseccion:
 
         self._control_trafico = control_trafico
         self._verbose_escenario = verbose_escenario
+        self._perfil_entrenamiento = perfil_entrenamiento
 
         self.suma_tiempos_espera_muestras = 0.0
         self.muestras_espera = 0
@@ -578,7 +580,10 @@ class Interseccion:
             FaseSemaforo.AMARILLO_EW,
         ):
             self.semaforo.programar_siguiente_verde_ns(
-                siguiente_grupo_es_ns(self._estado_para_politica_fase())
+                siguiente_grupo_es_ns(
+                    self._estado_para_politica_fase(),
+                    perfil_entrenamiento=self._perfil_entrenamiento,
+                )
             )
         if self.semaforo.fase in (FaseSemaforo.AMARILLO_NS, FaseSemaforo.AMARILLO_EW):
             tiempo_restante = float(config.DURACION_AMARILLO) - float(self.semaforo.tiempo_en_fase)

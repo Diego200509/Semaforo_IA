@@ -1,4 +1,3 @@
-"""Sistema de control difuso: variables lingüísticas, reglas y controlador."""
 
 from difuso.controlador import ControladorDifuso
 

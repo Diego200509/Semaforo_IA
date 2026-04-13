@@ -1,5 +1,3 @@
-"""Optimización genética de parámetros del sistema difuso."""
-
 from genetico.cromosoma import Cromosoma
 from genetico.fitness import evaluar_cromosoma
 

@@ -1,11 +1,3 @@
-"""
-Representación del individuo: 20 genes en [0, 1] que se ordenan en grupos de 5
-para formar vértices monótonos de funciones triangulares (bajo/medio/alto).
-
-Este diseño es fácil de explicar: el GA ajusta la forma de las membresías sin violar
-el orden lógico de los términos lingüísticos.
-"""
-
 from __future__ import annotations
 
 import json
@@ -65,7 +57,6 @@ class Cromosoma:
 
     @staticmethod
     def cruce(padre_a: "Cromosoma", padre_b: "Cromosoma", rng: random.Random) -> tuple["Cromosoma", "Cromosoma"]:
-        """Cruce por mezcla aritmética aleatoria (BLX-α simple)."""
         alpha = 0.35
         h1, h2 = [], []
         for a, b in zip(padre_a.genes, padre_b.genes):

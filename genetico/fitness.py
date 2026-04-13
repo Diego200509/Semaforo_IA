@@ -1,12 +1,3 @@
-"""
-Evaluación de individuos: simula con el motor programático y agrega métricas.
-
-La función compuesta penaliza espera y cola y premia vehículos atendidos; el GA maximiza
-el valor retornado (`fitness`).
-
-Fase 2: evaluación multi-escenario con promedio ponderado.
-"""
-
 from __future__ import annotations
 
 import hashlib
@@ -19,7 +10,6 @@ from simulacion.entorno import MotorSimulacionProgramatico
 
 
 def _normalizar_metricas(metricas: dict) -> dict[str, float]:
-    """Lleva magnitudes a escala comparable ~[0, 1]."""
     espera = float(metricas.get("tiempo_espera_promedio_muestras", 0.0))
     cola = float(metricas.get("longitud_cola_promedio_muestras", 0.0))
     espera_max = float(metricas.get("tiempo_espera_maximo", 0.0))
@@ -29,7 +19,6 @@ def _normalizar_metricas(metricas: dict) -> dict[str, float]:
 
     esp_n = min(1.0, espera / max(1e-6, config.ESPERA_MAX_UNIVERSO))
     cola_n = min(1.0, cola / max(1e-6, config.COLA_MAX_UNIVERSO))
-    # Los extremos se normalizan aparte para que el GA no esconda hambre de verde en los promedios.
     espera_max_n = min(1.0, espera_max / max(1e-6, config.ESPERA_MAX_UNIVERSO))
     cola_max_n = min(1.0, cola_max / max(1e-6, config.COLA_MAX_UNIVERSO))
     demora_promedio_n = min(1.0, demora_promedio / max(1e-6, config.ESPERA_MAX_UNIVERSO))
@@ -47,7 +36,6 @@ def _normalizar_metricas(metricas: dict) -> dict[str, float]:
 
 
 def coste_desde_metricas(metricas: dict) -> float:
-    """Menor es mejor."""
     normalizadas = _normalizar_metricas(metricas)
     return (
         config.PESO_TIEMPO_ESPERA * normalizadas["espera_promedio"]
@@ -60,7 +48,6 @@ def coste_desde_metricas(metricas: dict) -> float:
 
 
 def fitness_desde_metricas(metricas: dict) -> float:
-    """Mayor es mejor (maximización en el GA)."""
     return -coste_desde_metricas(metricas)
 
 
@@ -107,15 +94,6 @@ def evaluar_cromosoma(
     multi_escenario: bool | None = None,
     perfil_entrenamiento: str | None = None,
 ) -> tuple[float, dict]:
-    """
-    Ejecuta simulación(es) con el controlador parametrizado por `cromosoma`.
-
-    Si `multi_escenario` es True (o por defecto `config.USA_ENTRENAMIENTO_MULTI_ESCENARIO`)
-    y no se pasa `escenario`, el fitness es el promedio ponderado sobre
-    `ESCENARIOS_ENTRENAMIENTO_GA`.
-
-    Retorna (fitness, métricas de la última corrida o de la última del bloque multi).
-    """
     duracion = duracion if duracion is not None else config.DURACION_EVALUACION_FITNESS
     dt = dt if dt is not None else config.DT_SIMULACION_RAPIDA
 

@@ -1,12 +1,3 @@
-"""
-Algoritmo genético con **DEAP**: selección por torneo, cruce BLX (`cxBlend`),
-mutación gaussiana por gen y registro de estadísticas.
-
-El cromosoma sigue siendo `genetico.cromosoma.Cromosoma`; el mejor individuo
-se obtiene del `HallOfFame`. La evaluación usa semillas compartidas por
-generación para que todos los individuos compitan bajo el mismo tráfico.
-"""
-
 from __future__ import annotations
 
 import copy
@@ -22,7 +13,6 @@ from genetico.fitness import evaluar_cromosoma
 
 
 def _registrar_tipos_deap() -> None:
-    """Evita error si se vuelve a importar el módulo (FitnessMax ya definido)."""
     try:
         creator.create("FitnessMax", base.Fitness, weights=(1.0,))
     except RuntimeError:
@@ -46,7 +36,6 @@ def _mate_blend(ind1: list, ind2: list, alpha: float) -> tuple:
 
 
 def _mut_gauss(ind: list, mu: float, sigma: float, indpb: float) -> tuple:
-    """Misma idea que `Cromosoma.mutar`: probabilidad por gen + recorte a [0, 1]."""
     tools.mutGaussian(ind, mu=mu, sigma=sigma, indpb=indpb)
     _clip_genes(ind)
     return (ind,)
@@ -57,13 +46,6 @@ def _semillas_compartidas_generacion(
     generacion: int,
     cantidad: int = 3,
 ) -> tuple[int, ...]:
-    """
-    Genera un conjunto fijo de semillas por generación.
-
-    Todos los individuos evaluados en la misma generación usan exactamente estas
-    semillas, de modo que la comparación dependa del controlador y no de "suerte"
-    en el tráfico.
-    """
     rng = random.Random(semilla_base + 10_007 * generacion + 97)
     return tuple(rng.randrange(1, 2**31 - 1) for _ in range(max(1, int(cantidad))))
 
@@ -77,9 +59,6 @@ def _evaluar_poblacion_generacion(
     escenario_fitness: str | None,
     multi_escenario: bool | None,
 ) -> None:
-    """
-    Evalúa solo individuos inválidos usando el mismo bloque de semillas compartidas.
-    """
     perfil_cfg = config.obtener_perfil_entrenamiento(perfil_entrenamiento)
     semillas = _semillas_compartidas_generacion(
         semilla_base,
@@ -100,14 +79,10 @@ def _evaluar_poblacion_generacion(
                 perfil_entrenamiento=perfil_cfg.clave,
             )
             fitnesses.append(float(fit))
-        # Promedio sobre el mismo conjunto compartido: comparación justa dentro de la generación.
         individual.fitness.values = (sum(fitnesses) / len(fitnesses),)
 
 
 def _cantidad_elites(tamano_poblacion: int) -> int:
-    """
-    Limita el elitismo configurado para que siempre sea compatible con la población actual.
-    """
     return max(0, min(int(config.ELITISMO), int(tamano_poblacion)))
 
 
@@ -117,10 +92,6 @@ def ejecutar_ga(
     multi_escenario: bool | None = None,
     perfil_entrenamiento: str | None = None,
 ) -> Tuple[Cromosoma, List[float]]:
-    """
-    Evoluciona una población y devuelve el mejor cromosoma y la serie de mejores fitness
-    por generación (misma longitud que `GENERACIONES_GA`, sin incluir la estadística inicial).
-    """
     semilla_base = semilla_base if semilla_base is not None else config.SEMILLA_ALEATORIA
     perfil_cfg = config.obtener_perfil_entrenamiento(perfil_entrenamiento)
     random.seed(semilla_base)
@@ -140,7 +111,6 @@ def ejecutar_ga(
     toolbox.register("population", tools.initRepeat, list, toolbox.individual)
     toolbox.register("clone", copy.deepcopy)
     toolbox.register("mate", _mate_blend, alpha=0.35)
-    # La mutacion tambien depende del perfil para que PRUEBA explore mas sin tocar FINAL.
     toolbox.register(
         "mutate",
         _mut_gauss,
@@ -171,7 +141,6 @@ def ejecutar_ga(
 
     for gen in range(1, perfil_cfg.generaciones_ga + 1):
         print(f"Generación {gen}/{perfil_cfg.generaciones_ga} [{perfil_cfg.etiqueta_ui}]")
-        # Elitismo real: estos individuos pasan intactos a la siguiente generación.
         n_elites = _cantidad_elites(len(pop))
         elites = list(map(toolbox.clone, tools.selBest(pop, n_elites)))
 
@@ -204,7 +173,6 @@ def ejecutar_ga(
         logbook.record(gen=gen, nevals=len(offspring), **record)
 
     mejor = Cromosoma([float(x) for x in hof[0]])
-    # Gen 0 = población inicial; dejamos una entrada por generación evolutiva.
     todos_max = list(logbook.select("max"))
     historial = [float(x) for x in todos_max[1 : 1 + perfil_cfg.generaciones_ga]]
     if len(historial) < perfil_cfg.generaciones_ga:
@@ -216,9 +184,6 @@ def ejecutar_entrenamiento_banco(
     semilla_base: int | None = None,
     perfil_entrenamiento: str | None = None,
 ):
-    """
-    Entrena un cromosoma por cada etiqueta de contexto (un escenario GA cada uno).
-    """
     from adaptacion.banco import BancoCromosomas, ETIQUETAS_VALIDAS, guardar_banco
 
     semilla_base = semilla_base if semilla_base is not None else config.SEMILLA_ALEATORIA

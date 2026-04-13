@@ -1,9 +1,3 @@
-"""
-Controlador difuso Mamdani simplificado: estado de tráfico -> duración de verde (s).
-
-Las funciones de membresía y la defuzzificación se apoyan en **scikit-fuzzy** (`skfuzzy`).
-"""
-
 from __future__ import annotations
 
 from typing import Dict, Mapping
@@ -23,9 +17,6 @@ from difuso.variables import (
 
 
 class ControladorDifuso:
-    """
-    Inferencia difusa tipo Mamdani; parámetros del cromosoma reconstruyen las membresías.
-    """
 
     def __init__(self, parametros: ParametrosMembresia | None = None) -> None:
         self.parametros = parametros or parametros_por_defecto()
@@ -40,17 +31,14 @@ class ControladorDifuso:
         self._mf_v = aplicar_trimf(self._u_v, p.verde)
 
     def actualizar_parametros(self, parametros: ParametrosMembresia) -> None:
-        """Usado por el GA tras decodificar un cromosoma."""
         self.parametros = parametros
         self._reconstruir_funciones()
 
     def _normalizar_entradas(self, estado: Mapping[str, float]) -> tuple[float, float, float]:
         dens_raw = estado.get("densidad_ponderada", estado.get("densidad_vehicular", 0.0))
         dens = float(np.clip(float(dens_raw), 0.0, 1.0))
-        # Si el motor envía `inferir_para_grupo_ns`, cola y espera del eje que recibe el verde.
         eje = estado.get("inferir_para_grupo_ns", None)
         if eje is True:
-            # Si existe snapshot pre-verde, usamos esa cola porque representa la demanda real al arrancar.
             cola_preverde = estado.get("cola_ns_preverde", None)
             cola = float(cola_preverde if cola_preverde is not None else estado.get("cola_ns", 0.0))
             esp = float(estado.get("espera_ns", estado.get("tiempo_espera_promedio", 0.0)))
@@ -78,13 +66,6 @@ class ControladorDifuso:
         )
 
     def inferir_tiempo_verde(self, estado: Mapping[str, float]) -> float:
-        """
-        Retorna segundos de luz verde en [VERDE_MIN, VERDE_MAX].
-
-        Si `estado` incluye la clave booleana `inferir_para_grupo_ns` (inyectada por el motor
-        al iniciar cada verde), las entradas **espera** y **cola** del difuso corresponden a ese
-        eje; si falta, se usa el comportamiento previo (espera global y max(colas)).
-        """
         d, e, c = self._normalizar_entradas(estado)
         g_d = self._grados_por_variable(d, self._u_d, self._mf_d)
         g_e = self._grados_por_variable(e, self._u_e, self._mf_e)
@@ -105,5 +86,4 @@ class ControladorDifuso:
         return float(np.clip(verde, config.VERDE_MIN, config.VERDE_MAX))
 
     def __call__(self, estado: Dict) -> float:
-        """Compatibilidad con callbacks del motor de simulación."""
         return self.inferir_tiempo_verde(estado)

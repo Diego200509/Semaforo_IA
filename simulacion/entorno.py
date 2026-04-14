@@ -83,6 +83,8 @@ class MotorSimulacionProgramatico(MotorSimulacion):
         verbose_escenario: bool = False,
         fase_adaptativa: bool | None = None,
         perfil_entrenamiento: str | None = None,
+        etiqueta_control: str | None = None,
+        fuente_control: str | None = None,
     ) -> None:
         esc = (escenario or config.ESCENARIO_POR_DEFECTO).strip().lower()
         if duracion_planeada is not None:
@@ -101,6 +103,9 @@ class MotorSimulacionProgramatico(MotorSimulacion):
         )
         self.interseccion.configurar_modo_tiempo_fijo(modo_tiempo_fijo)
         self._callback = callback_tiempo_verde
+        self._etiqueta_control = etiqueta_control or ("Semaforo fijo" if modo_tiempo_fijo else "Control difuso")
+        self._fuente_control = fuente_control or ("fijo" if modo_tiempo_fijo else "difuso")
+        self._ultima_decision_verde: Dict[str, Any] | None = None
         # Evita recalcular el verde varias veces dentro de la misma fase verde.
         self._fase_en_que_se_fijo_verde: FaseSemaforo | None = None
 
@@ -108,6 +113,7 @@ class MotorSimulacionProgramatico(MotorSimulacion):
         """Reinicia el escenario; `semilla` controla la aleatoriedad del tráfico."""
         self.interseccion.reiniciar(semilla=semilla)
         self._fase_en_que_se_fijo_verde = None
+        self._ultima_decision_verde = None
 
     def obtener_estado_trafico(self) -> dict:
         return self.interseccion.obtener_estado_trafico()
@@ -118,24 +124,73 @@ class MotorSimulacionProgramatico(MotorSimulacion):
     def obtener_metricas(self) -> dict:
         return self.interseccion.obtener_metricas()
 
+    def _duracion_programada_para_fase(self, fase: FaseSemaforo) -> float:
+        sem = self.interseccion.semaforo
+        if fase in (FaseSemaforo.VERDE_NS, FaseSemaforo.AMARILLO_NS):
+            return float(config.VERDE_FIJO_NS) if sem.modo_tiempo_fijo else float(sem.duracion_verde_ns)
+        if fase in (FaseSemaforo.VERDE_EW, FaseSemaforo.AMARILLO_EW):
+            return float(config.VERDE_FIJO_EW) if sem.modo_tiempo_fijo else float(sem.duracion_verde_ew)
+        return float(config.VERDE_FIJO_NS)
+
+    def _eje_fase(self, fase: FaseSemaforo) -> str:
+        return "NS" if fase in (FaseSemaforo.VERDE_NS, FaseSemaforo.AMARILLO_NS) else "EW"
+
+    def _registrar_decision_verde(self, fase: FaseSemaforo, segundos: float, origen: str) -> None:
+        eje = self._eje_fase(fase)
+        self._ultima_decision_verde = {
+            "modo": self._etiqueta_control,
+            "fuente": origen,
+            "eje": eje,
+            "duracion_verde": float(segundos),
+            "instante": float(self.interseccion.tiempo_simulado),
+        }
+        print(
+            f"[t={self.interseccion.tiempo_simulado:6.2f} s] "
+            f"Modo={self._etiqueta_control} | Eje={eje} | Verde={segundos:.2f} s | Fuente={origen}"
+        )
+
+    def obtener_info_control(self) -> dict[str, Any]:
+        sem = self.interseccion.semaforo
+        fase = sem.fase
+        if fase == FaseSemaforo.VERDE_NS:
+            restante = max(0.0, self._duracion_programada_para_fase(fase) - float(sem.tiempo_en_fase))
+        elif fase == FaseSemaforo.VERDE_EW:
+            restante = max(0.0, self._duracion_programada_para_fase(fase) - float(sem.tiempo_en_fase))
+        else:
+            restante = max(0.0, float(config.DURACION_AMARILLO) - float(sem.tiempo_en_fase))
+        return {
+            "modo": self._etiqueta_control,
+            "fuente": self._ultima_decision_verde["fuente"] if self._ultima_decision_verde else self._fuente_control,
+            "eje_activo": self._eje_fase(fase),
+            "fase": fase.name,
+            "duracion_verde_actual": float(self._duracion_programada_para_fase(fase)),
+            "tiempo_restante_fase": float(restante),
+        }
+
     def actualizar(self, dt: float) -> None:
         """Avanza la intersección y ajusta el verde una sola vez al entrar en cada fase verde."""
         self.interseccion.actualizar(dt)
         sem = self.interseccion.semaforo
-        if self._callback is None or sem.modo_tiempo_fijo:
-            return
         if sem.fase not in (FaseSemaforo.VERDE_NS, FaseSemaforo.VERDE_EW):
             self._fase_en_que_se_fijo_verde = None
             return
         if self._fase_en_que_se_fijo_verde == sem.fase:
             return
-        estado = dict(self.obtener_estado_trafico())
-        estado["inferir_para_grupo_ns"] = sem.fase == FaseSemaforo.VERDE_NS
-        try:
-            t = float(self._callback(estado))
-        except Exception:
-            t = float(config.VERDE_FIJO_NS)
-        self.aplicar_tiempo_verde(t)
+        if self._callback is None or sem.modo_tiempo_fijo:
+            t = self._duracion_programada_para_fase(sem.fase)
+            origen = "fijo"
+        else:
+            estado = dict(self.obtener_estado_trafico())
+            estado["inferir_para_grupo_ns"] = sem.fase == FaseSemaforo.VERDE_NS
+            try:
+                t = float(self._callback(estado))
+                origen = self._fuente_control
+            except Exception:
+                t = float(config.VERDE_FIJO_NS)
+                origen = "fallback_fijo"
+            self.aplicar_tiempo_verde(t)
+            t = self._duracion_programada_para_fase(sem.fase)
+        self._registrar_decision_verde(sem.fase, t, origen)
         self._fase_en_que_se_fijo_verde = sem.fase
 
 
@@ -152,6 +207,8 @@ class MotorSimulacionPygame(MotorSimulacionProgramatico):
         verbose_escenario: bool = False,
         fase_adaptativa: bool | None = None,
         perfil_entrenamiento: str | None = None,
+        etiqueta_control: str | None = None,
+        fuente_control: str | None = None,
     ) -> None:
         super().__init__(
             semilla=semilla,
@@ -162,6 +219,8 @@ class MotorSimulacionPygame(MotorSimulacionProgramatico):
             verbose_escenario=verbose_escenario,
             fase_adaptativa=fase_adaptativa,
             perfil_entrenamiento=perfil_entrenamiento,
+            etiqueta_control=etiqueta_control,
+            fuente_control=fuente_control,
         )
         self._pg = _import_pygame()
         self._pg.init()
@@ -508,7 +567,11 @@ class MotorSimulacionPygame(MotorSimulacionProgramatico):
 
         estado = self.obtener_estado_trafico()
         m = self.obtener_metricas()
+        info = self.obtener_info_control()
         lineas = [
+            f"Modo: {info['modo']}",
+            f"Fuente: {info['fuente']} | Eje activo: {info['eje_activo']}",
+            f"Verde programado: {info['duracion_verde_actual']:.2f} s | Restante fase: {info['tiempo_restante_fase']:.2f} s",
             f"Densidad: {estado['densidad_vehicular']:.2f}",
             f"Espera prom.: {estado['tiempo_espera_promedio']:.1f} s",
             f"Cola max.: {estado['longitud_cola']:.0f}",

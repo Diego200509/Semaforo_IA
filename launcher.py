@@ -136,7 +136,7 @@ def _args_sim_base(
 class LauncherApp(tk.Tk):
     def __init__(self) -> None:
         super().__init__()
-        self.title("Semáforo inteligente — Menú principal")
+        self.title("Semáforo inteligente — Panel principal")
         self.minsize(520, 620)
         self.geometry("760x760")
 
@@ -151,9 +151,9 @@ class LauncherApp(tk.Tk):
         self._tab_sim = ttk.Frame(nb, padding=8)
         self._tab_reportes = ttk.Frame(nb, padding=8)
         self._tab_graficas = ttk.Frame(nb, padding=8)
-        nb.add(self._tab_sim, text="  Ver el cruce (simulación)  ")
-        nb.add(self._tab_reportes, text="  Entrenar y comparar  ")
-        nb.add(self._tab_graficas, text="  Graficas  ")
+        nb.add(self._tab_sim, text="  Simulación  ")
+        nb.add(self._tab_reportes, text="  Entrenamiento  ")
+        nb.add(self._tab_graficas, text="  Gráficas  ")
 
         self._build_tab_sim()
         self._build_tab_reportes()
@@ -250,118 +250,67 @@ class LauncherApp(tk.Tk):
 
     def _build_tab_sim(self) -> None:
         f = self._tab_sim
+        lf_cfg = ttk.LabelFrame(f, text="Configuración", padding=8)
+        lf_cfg.pack(fill=tk.X, pady=(0, 8))
 
-        lf_esc = ttk.LabelFrame(f, text="Cuánto tráfico hay en la simulación", padding=8)
-        lf_esc.pack(fill=tk.X, pady=(0, 8))
+        fila_esc = ttk.Frame(lf_cfg)
+        fila_esc.pack(fill=tk.X, pady=(0, 8))
+        ttk.Label(fila_esc, text="Tráfico:").pack(side=tk.LEFT)
         self.var_escenario = tk.StringVar(value=ESCENARIOS[0])
         ttk.Combobox(
-            lf_esc,
+            fila_esc,
             textvariable=self.var_escenario,
             values=ESCENARIOS,
             state="readonly",
-            width=24,
-        ).pack(anchor=tk.W)
-        ttk.Label(
-            lf_esc,
-            text="bajo = pocos coches · pico = muchos · desbalanceado = más en un sentido · mixto = cambia con el tiempo",
-            wraplength=520,
-        ).pack(anchor=tk.W, pady=(6, 0))
-
-        lf_opt = ttk.LabelFrame(f, text="Cómo controla el semáforo (marca lo que necesites)", padding=8)
-        lf_opt.pack(fill=tk.X, pady=(0, 8))
-        self.var_default = tk.BooleanVar(value=False)
-        self.var_ga = tk.BooleanVar(value=False)
-        self.var_banco = tk.BooleanVar(value=False)
-        self.var_tiempo_fijo = tk.BooleanVar(value=False)
-        self.var_verbose = tk.BooleanVar(value=False)
-        self.var_no_adapt = tk.BooleanVar(value=False)
-        self.var_perfil_sim = tk.StringVar(value=cfg.obtener_perfil_entrenamiento().etiqueta_ui)
-        fila_perfil = ttk.Frame(lf_opt)
-        fila_perfil.pack(fill=tk.X, pady=(0, 8))
-        ttk.Label(fila_perfil, text="Perfil de entrenamiento:").pack(side=tk.LEFT)
-        ttk.Combobox(
-            fila_perfil,
-            textvariable=self.var_perfil_sim,
-            values=PERFILES_ENTRENAMIENTO_UI,
-            state="readonly",
-            width=12,
+            width=18,
         ).pack(side=tk.LEFT, padx=8)
-        ttk.Checkbutton(
-            lf_opt,
-            text="Usar reglas por defecto (ignorar archivos de entrenamiento)",
-            variable=self.var_default,
-        ).pack(anchor=tk.W)
-        ttk.Checkbutton(
-            lf_opt,
-            text="Usar solo el último entrenamiento (requiere archivo guardado del algoritmo genético)",
-            variable=self.var_ga,
-        ).pack(anchor=tk.W)
-        ttk.Checkbutton(
-            lf_opt,
-            text="Elegir reglas distintas según cómo esté el tráfico (archivo “banco” de configuraciones)",
-            variable=self.var_banco,
-        ).pack(anchor=tk.W)
-        ttk.Checkbutton(
-            lf_opt,
-            text="Semáforo clásico: duraciones fijas, sin lógica difusa",
-            variable=self.var_tiempo_fijo,
-        ).pack(anchor=tk.W)
-        ttk.Checkbutton(
-            lf_opt,
-            text="Mostrar en consola cada cambio de tráfico (útil con escenario “mixto”)",
-            variable=self.var_verbose,
-        ).pack(anchor=tk.W)
-        ttk.Checkbutton(
-            lf_opt,
-            text="Ciclo Norte-Sur / Este-Oeste siempre igual (no alargar verde por colas largas)",
-            variable=self.var_no_adapt,
-        ).pack(anchor=tk.W)
-        self._enlazar_exclusiones_control_semaforo()
-        self.lbl_nota_opciones = ttk.Label(lf_opt, text="", wraplength=500)
-        self.lbl_nota_opciones.pack(anchor=tk.W, pady=(10, 0))
-        for _v in (
-            self.var_perfil_sim,
-            self.var_default,
-            self.var_ga,
-            self.var_banco,
-            self.var_tiempo_fijo,
-            self.var_verbose,
-            self.var_no_adapt,
-        ):
-            _v.trace_add("write", lambda *_a, s=self: s._refrescar_nota_opciones())
-        self._refrescar_nota_opciones()
 
-        lf_run = ttk.LabelFrame(f, text="Poner en marcha", padding=8)
+        lf_control = ttk.LabelFrame(lf_cfg, text="Modo de control", padding=8)
+        lf_control.pack(fill=tk.X)
+        self.var_modo_control = tk.StringVar(value="ga")
+        ttk.Radiobutton(
+            lf_control,
+            text="Semáforo fijo",
+            value="fijo",
+            variable=self.var_modo_control,
+        ).pack(anchor=tk.W)
+        ttk.Radiobutton(
+            lf_control,
+            text="Lógica difusa (base)",
+            value="difuso_base",
+            variable=self.var_modo_control,
+        ).pack(anchor=tk.W)
+        ttk.Radiobutton(
+            lf_control,
+            text="Lógica difusa optimizada (GA)",
+            value="ga",
+            variable=self.var_modo_control,
+        ).pack(anchor=tk.W)
+
+        lf_run = ttk.LabelFrame(f, text="Ejecución", padding=8)
         lf_run.pack(fill=tk.BOTH, expand=True)
+        fila_duracion = ttk.Frame(lf_run)
+        fila_duracion.pack(fill=tk.X, pady=(0, 8))
+        ttk.Label(fila_duracion, text="Duración (opcional):").pack(side=tk.LEFT)
+        self.var_seg_sim = tk.StringVar(value="")
+        ttk.Entry(fila_duracion, textvariable=self.var_seg_sim, width=10).pack(side=tk.LEFT, padx=8)
+        ttk.Label(
+            lf_run,
+            text="Si dejas la duración vacía, se abre la simulación animada. Si indicas segundos, se ejecuta una corrida rápida en consola.",
+            wraplength=620,
+        ).pack(anchor=tk.W, pady=(0, 10))
         ttk.Button(
             lf_run,
-            text="▶ Abrir ventana del cruce (simulación animada)",
-            command=self._sim_visual,
-        ).pack(fill=tk.X, pady=4)
-        ttk.Label(
-            lf_run,
-            text="Sin ventana: solo números y métricas en una consola negra.",
-            wraplength=520,
-        ).pack(anchor=tk.W, pady=(4, 0))
-        row = ttk.Frame(lf_run)
-        row.pack(fill=tk.X, pady=4)
-        ttk.Label(row, text="Duración en segundos:").pack(side=tk.LEFT)
-        self.var_seg_prog = tk.StringVar(value="90")
-        ttk.Entry(row, textvariable=self.var_seg_prog, width=8).pack(side=tk.LEFT, padx=6)
-        ttk.Button(row, text="Ejecutar simulación en consola", command=self._sim_prog).pack(side=tk.LEFT)
+            text="▶ Ejecutar simulación",
+            command=self._ejecutar_simulacion,
+        ).pack(fill=tk.X)
 
     def _build_tab_reportes(self) -> None:
         f = self._tab_reportes
-
-        lf_ga = ttk.LabelFrame(f, text="Entrenar el sistema (suele tardar bastante)", padding=8)
-        lf_ga.pack(fill=tk.X, pady=(0, 8))
-        ttk.Label(
-            lf_ga,
-            text="Busca mejores tiempos de verde; guarda un archivo y una curva en la carpeta graficas/.",
-            wraplength=520,
-        ).pack(anchor=tk.W, pady=(0, 6))
-        fila_perfil = ttk.Frame(lf_ga)
-        fila_perfil.pack(fill=tk.X, pady=(0, 6))
+        lf_cfg = ttk.LabelFrame(f, text="Configuración", padding=8)
+        lf_cfg.pack(fill=tk.X, pady=(0, 8))
+        fila_perfil = ttk.Frame(lf_cfg)
+        fila_perfil.pack(fill=tk.X)
         self.var_perfil_train = tk.StringVar(value=cfg.obtener_perfil_entrenamiento().etiqueta_ui)
         ttk.Label(fila_perfil, text="Perfil de entrenamiento:").pack(side=tk.LEFT)
         ttk.Combobox(
@@ -371,99 +320,55 @@ class LauncherApp(tk.Tk):
             state="readonly",
             width=12,
         ).pack(side=tk.LEFT, padx=8)
-        self.lbl_nota_perfil_train = ttk.Label(lf_ga, text="", wraplength=520)
-        self.lbl_nota_perfil_train.pack(anchor=tk.W, pady=(0, 6))
-        self.var_perfil_train.trace_add("write", lambda *_: self._refrescar_nota_perfil_train())
-        self._refrescar_nota_perfil_train()
+
+        lf_run = ttk.LabelFrame(f, text="Ejecución", padding=8)
+        lf_run.pack(fill=tk.X, pady=(0, 8))
         ttk.Button(
-            lf_ga,
-            text="Entrenar una sola configuración óptima (recomendado para empezar)",
+            lf_run,
+            text="Entrenar modelo",
             command=self._entrenar,
         ).pack(fill=tk.X, pady=2)
         ttk.Button(
-            lf_ga,
-            text="Entrenar varias configuraciones (una por tipo de tráfico)",
+            lf_run,
+            text="Entrenar múltiples configuraciones",
             command=self._entrenar_banco,
         ).pack(fill=tk.X, pady=2)
 
-        lf_cmp = ttk.LabelFrame(f, text="Comparar estrategias con varias pruebas", padding=8)
-        lf_cmp.pack(fill=tk.X, pady=(0, 8))
-        ttk.Label(
-            lf_cmp,
-            text="Repite la simulación con distintas semillas y genera gráficas en graficas/.",
-            wraplength=520,
-        ).pack(anchor=tk.W, pady=(0, 6))
-        r1 = ttk.Frame(lf_cmp)
-        r1.pack(fill=tk.X, pady=4)
-        ttk.Label(r1, text="Segundos por prueba:").pack(side=tk.LEFT)
-        self.var_seg_comparar = tk.StringVar(value=str(int(self._duracion_comparar_default)))
-        ttk.Entry(r1, textvariable=self.var_seg_comparar, width=8).pack(side=tk.LEFT, padx=6)
-        ttk.Label(r1, text="Tráfico:").pack(side=tk.LEFT, padx=(12, 0))
-        self.var_escenario_cmp = tk.StringVar(value=ESCENARIOS[0])
-        ttk.Combobox(
-            r1,
-            textvariable=self.var_escenario_cmp,
-            values=ESCENARIOS,
-            state="readonly",
-            width=14,
-        ).pack(side=tk.LEFT, padx=6)
-        ttk.Button(lf_cmp, text="Ejecutar comparación y generar gráficas", command=self._comparar).pack(fill=tk.X, pady=4)
-
-        lf_full = ttk.LabelFrame(f, text="Comparar las tres formas de control", padding=8)
-        lf_full.pack(fill=tk.X, pady=(0, 8))
-        ttk.Label(
-            lf_full,
-            text="Tiempos fijos vs lógica difusa vs difusa mejorada por entrenamiento.",
-            wraplength=520,
-        ).pack(anchor=tk.W, pady=(0, 6))
-        ttk.Button(
-            lf_full,
-            text="Ejecutar y guardar gráfico de costes en graficas/",
-            command=self._comparar_completo,
-        ).pack(fill=tk.X, pady=2)
-
-        ttk.Label(
-            f,
-            text="Cada acción abre una consola: ahí ves el progreso. Las imágenes quedan en la carpeta graficas/.",
-            wraplength=520,
-        ).pack(fill=tk.X, pady=(8, 0))
+        lf_out = ttk.LabelFrame(f, text="Resultados", padding=8)
+        lf_out.pack(fill=tk.BOTH, expand=True)
+        self.lbl_nota_perfil_train = ttk.Label(lf_out, text="", wraplength=620, justify=tk.LEFT)
+        self.lbl_nota_perfil_train.pack(anchor=tk.W)
+        self.var_perfil_train.trace_add("write", lambda *_: self._refrescar_nota_perfil_train())
+        self._refrescar_nota_perfil_train()
 
     def _build_tab_graficas(self) -> None:
         f = self._tab_graficas
 
-        lf_acciones = ttk.LabelFrame(f, text="Generar y actualizar", padding=8)
+        lf_acciones = ttk.LabelFrame(f, text="Acciones", padding=8)
         lf_acciones.pack(fill=tk.X, pady=(0, 8))
-        ttk.Label(
-            lf_acciones,
-            text=(
-                "Estas acciones reutilizan los comandos oficiales del proyecto "
-                "y refrescan la carpeta graficas/ al terminar."
-            ),
-            wraplength=680,
-        ).pack(anchor=tk.W, pady=(0, 8))
         ttk.Button(
             lf_acciones,
-            text="Generar graficas de membresia",
+            text="Generar gráficas de membresía",
             command=self._graficas_generar_membresias,
         ).pack(fill=tk.X, pady=2)
         ttk.Button(
             lf_acciones,
-            text="Entrenar GA final y actualizar fitness",
+            text="Entrenar GA y actualizar fitness",
             command=self._graficas_entrenar_final,
         ).pack(fill=tk.X, pady=2)
         ttk.Button(
             lf_acciones,
-            text="Comparar estrategias y actualizar comparativas",
+            text="Comparar estrategias",
             command=self._graficas_comparar_final,
         ).pack(fill=tk.X, pady=2)
         ttk.Button(
             lf_acciones,
-            text="Comparacion completa y actualizar costes",
+            text="Comparación completa",
             command=self._graficas_comparar_completo_final,
         ).pack(fill=tk.X, pady=2)
 
         self.var_estado_graficas = tk.StringVar(
-            value="Listo. Usa esta pestaña para generar, abrir y revisar las imagenes."
+            value="Listo para generar y revisar resultados."
         )
         ttk.Label(
             lf_acciones,
@@ -472,13 +377,13 @@ class LauncherApp(tk.Tk):
             foreground="#1f4f82",
         ).pack(anchor=tk.W, pady=(10, 0))
 
-        lf_lista = ttk.LabelFrame(f, text="Imagenes disponibles en graficas", padding=8)
+        lf_lista = ttk.LabelFrame(f, text="Resultados", padding=8)
         lf_lista.pack(fill=tk.BOTH, expand=True)
 
         fila_top = ttk.Frame(lf_lista)
         fila_top.pack(fill=tk.X, pady=(0, 8))
         ttk.Button(fila_top, text="Refrescar lista", command=self._refrescar_lista_graficas).pack(side=tk.LEFT)
-        ttk.Button(fila_top, text="Abrir carpeta graficas", command=self._abrir_carpeta_graficas).pack(
+        ttk.Button(fila_top, text="Abrir carpeta", command=self._abrir_carpeta_graficas).pack(
             side=tk.LEFT, padx=6
         )
 
@@ -505,7 +410,7 @@ class LauncherApp(tk.Tk):
             command=self._abrir_grafica_seleccionada,
         ).pack(side=tk.LEFT, padx=6)
 
-        self.var_grafica_actual = tk.StringVar(value="No hay imagen seleccionada.")
+        self.var_grafica_actual = tk.StringVar(value="No hay imágenes disponibles.")
         ttk.Label(
             lf_lista,
             textvariable=self.var_grafica_actual,
@@ -515,7 +420,7 @@ class LauncherApp(tk.Tk):
         self._refrescar_lista_graficas()
 
     def _perfil_sim_clave(self) -> str:
-        return PERFIL_UI_A_CLAVE.get(self.var_perfil_sim.get(), cfg.PERFIL_ENTRENAMIENTO_POR_DEFECTO)
+        return cfg.PERFIL_ENTRENAMIENTO_POR_DEFECTO
 
     def _perfil_train_clave(self) -> str:
         return PERFIL_UI_A_CLAVE.get(self.var_perfil_train.get(), cfg.PERFIL_ENTRENAMIENTO_POR_DEFECTO)
@@ -526,58 +431,76 @@ class LauncherApp(tk.Tk):
         perfil = cfg.obtener_perfil_entrenamiento(self._perfil_train_clave())
         self.lbl_nota_perfil_train.configure(
             text=(
-                f"{perfil.etiqueta_ui}: población {perfil.poblacion_ga}, generaciones {perfil.generaciones_ga}, "
-                f"salida {perfil.archivo_mejor_cromosoma.name} / {perfil.archivo_banco_cromosomas.name}"
+                f"Cromosoma: {perfil.archivo_mejor_cromosoma.name}\n"
+                f"Banco: {perfil.archivo_banco_cromosomas.name}\n"
+                f"Gráfica esperada: {cfg.CARPETA_GRAFICAS.name}/evolucion_fitness_{perfil.clave}.png"
             )
         )
+
+    def _args_modo_control(self) -> list[str]:
+        modo = self.var_modo_control.get().strip().lower()
+        if modo == "fijo":
+            return ["--tiempo-fijo"]
+        if modo == "difuso_base":
+            return ["--usar-default"]
+        return ["--usar-ga"]
+
+    def _ejecutar_simulacion(self) -> None:
+        esc = self.var_escenario.get().strip().lower()
+        if esc not in ESCENARIOS:
+            messagebox.showerror("Escenario", f"Escenario no válido: {esc}")
+            return
+
+        args = [
+            "--escenario",
+            esc,
+            "--perfil-entrenamiento",
+            self._perfil_sim_clave(),
+            *self._args_modo_control(),
+        ]
+
+        seg_txt = self.var_seg_sim.get().strip().replace(",", ".")
+        if not seg_txt:
+            _popen_main(["--modo", "sim_visual", *args])
+            return
+
+        try:
+            seg = float(seg_txt)
+            if seg <= 0:
+                raise ValueError
+        except ValueError:
+            messagebox.showerror("Duración", "Indica un número de segundos válido (> 0) o deja el campo vacío.")
+            return
+
+        _popen_main(["--modo", "sim_prog", "--segundos", str(seg), *args])
 
     def _flags_sim(self) -> tuple[str, dict[str, bool | str]] | None:
         esc = self.var_escenario.get().strip().lower()
         if esc not in ESCENARIOS:
             messagebox.showerror("Escenario", f"Escenario no válido: {esc}")
             return None
+        modo = self.var_modo_control.get().strip().lower()
         d = {
             "perfil_entrenamiento": self._perfil_sim_clave(),
-            "usar_default": self.var_default.get(),
-            "usar_ga": self.var_ga.get(),
-            "adaptacion_banco": self.var_banco.get(),
-            "tiempo_fijo": self.var_tiempo_fijo.get(),
-            "verbose_escenario": self.var_verbose.get(),
-            "no_fase_adaptativa": self.var_no_adapt.get(),
+            "usar_default": modo == "difuso_base",
+            "usar_ga": modo == "ga",
+            "adaptacion_banco": False,
+            "tiempo_fijo": modo == "fijo",
+            "verbose_escenario": False,
+            "no_fase_adaptativa": False,
         }
-        err = _validar_opciones_sim(
-            usar_default=d["usar_default"],
-            usar_ga=d["usar_ga"],
-            adaptacion_banco=d["adaptacion_banco"],
-            tiempo_fijo=d["tiempo_fijo"],
-        )
-        if err:
-            messagebox.showerror("Opciones que no van juntas", err)
-            return None
         return esc, d
 
     def _sim_visual(self) -> None:
-        got = self._flags_sim()
-        if not got:
-            return
-        esc, d = got
-        args = ["--modo", "sim_visual", *_args_sim_base(esc, **d)]
-        _popen_main(args)
+        actual = self.var_seg_sim.get()
+        self.var_seg_sim.set("")
+        try:
+            self._ejecutar_simulacion()
+        finally:
+            self.var_seg_sim.set(actual)
 
     def _sim_prog(self) -> None:
-        got = self._flags_sim()
-        if not got:
-            return
-        esc, d = got
-        try:
-            seg = float(self.var_seg_prog.get().replace(",", "."))
-            if seg <= 0:
-                raise ValueError
-        except ValueError:
-            messagebox.showerror("Duración", "Indica un número de segundos válido (> 0).")
-            return
-        args = ["--modo", "sim_prog", "--segundos", str(seg), *_args_sim_base(esc, **d)]
-        _popen_main(args)
+        self._ejecutar_simulacion()
 
     def _entrenar(self) -> None:
         _popen_main(["--modo", "entrenar", "--perfil-entrenamiento", self._perfil_train_clave()])
@@ -586,32 +509,10 @@ class LauncherApp(tk.Tk):
         _popen_main(["--modo", "entrenar_banco", "--perfil-entrenamiento", self._perfil_train_clave()])
 
     def _comparar(self) -> None:
-        try:
-            seg = float(self.var_seg_comparar.get().replace(",", "."))
-            if seg <= 0:
-                raise ValueError
-        except ValueError:
-            messagebox.showerror("Duración", "Indica segundos válidos para comparar.")
-            return
-        esc = self.var_escenario_cmp.get().strip().lower()
-        if esc not in ESCENARIOS:
-            messagebox.showerror("Escenario", f"Escenario no válido: {esc}")
-            return
-        _popen_main(
-            [
-                "--modo",
-                "comparar",
-                "--segundos",
-                str(seg),
-                "--escenario",
-                esc,
-                "--perfil-entrenamiento",
-                self._perfil_train_clave(),
-            ]
-        )
+        self._graficas_comparar_final()
 
     def _comparar_completo(self) -> None:
-        _popen_main(["--modo", "comparar_completo", "--perfil-entrenamiento", self._perfil_train_clave()])
+        self._graficas_comparar_completo_final()
 
     def _python_cmd_proyecto(self) -> list[str] | None:
         python_cmd = _resolver_python_proyecto()
@@ -654,7 +555,7 @@ class LauncherApp(tk.Tk):
         self._proceso_graficas_activo = False
         self._refrescar_lista_graficas()
         if returncode == 0:
-            self.var_estado_graficas.set(f"Proceso terminado: {titulo}. Lista de imagenes actualizada.")
+            self.var_estado_graficas.set(f"Proceso terminado: {titulo}. Lista de imágenes actualizada.")
             return
         self.var_estado_graficas.set(f"El proceso finalizo con errores: {titulo}.")
         messagebox.showwarning(
@@ -722,7 +623,7 @@ class LauncherApp(tk.Tk):
         self._grafica_seleccionada = None
         if not self._imagenes_graficas:
             self.var_grafica_actual.set(
-                f"No hay imagenes en {CARPETA_GRAFICAS}. Genera una grafica desde esta pestaña."
+                f"No hay imágenes en {CARPETA_GRAFICAS}. Genera una gráfica desde esta pestaña."
             )
             return
         for ruta in self._imagenes_graficas:

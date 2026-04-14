@@ -78,6 +78,20 @@ def _imprimir_aviso_parametros(msg: MensajeParametros) -> None:
         print("Usando parámetros por defecto")
 
 
+def _etiqueta_control_desde_flags(
+    *,
+    tiempo_fijo: bool,
+    msg: MensajeParametros | None,
+) -> tuple[str, str]:
+    if tiempo_fijo:
+        return "Semaforo fijo", "fijo"
+    if msg == "ga":
+        return "Logica difusa optimizada (GA)", "ga"
+    if msg == "banco":
+        return "Logica difusa contextual (banco)", "banco"
+    return "Logica difusa (base)", "difuso_base"
+
+
 def _duracion_planeada_visual(escenario: str) -> float:
     if escenario == "mixto":
         return float(config.DURACION_PLAN_VISUAL_MIXTO)
@@ -97,6 +111,7 @@ def modo_simulacion_visual(
     fase_adaptativa: bool,
     perfil_entrenamiento: str,
 ) -> None:
+    msg: MensajeParametros | None = None
     if tiempo_fijo:
         control = None
     else:
@@ -114,6 +129,10 @@ def modo_simulacion_visual(
     perfil_cfg = config.obtener_perfil_entrenamiento(perfil_entrenamiento)
     print(f"Escenario de tráfico: {escenario}")
     print(f"Perfil cargado: {perfil_cfg.etiqueta_ui}")
+    etiqueta_control, fuente_control = _etiqueta_control_desde_flags(
+        tiempo_fijo=tiempo_fijo,
+        msg=msg,
+    )
 
     motor = MotorSimulacionPygame(
         semilla=config.SEMILLA_ALEATORIA,
@@ -124,6 +143,8 @@ def modo_simulacion_visual(
         verbose_escenario=verbose_escenario,
         fase_adaptativa=fase_adaptativa,
         perfil_entrenamiento=perfil_cfg.clave,
+        etiqueta_control=etiqueta_control,
+        fuente_control=fuente_control,
     )
     motor.reiniciar(semilla=config.SEMILLA_ALEATORIA)
     print("Ventana gráfica: cierra la ventana o pulsa ESC para salir.")
@@ -152,6 +173,7 @@ def modo_simulacion_programatica(
     fase_adaptativa: bool,
     perfil_entrenamiento: str,
 ) -> None:
+    msg: MensajeParametros | None = None
     if tiempo_fijo:
         control = None
     else:
@@ -169,6 +191,10 @@ def modo_simulacion_programatica(
     perfil_cfg = config.obtener_perfil_entrenamiento(perfil_entrenamiento)
     print(f"Escenario de tráfico: {escenario}")
     print(f"Perfil cargado: {perfil_cfg.etiqueta_ui}")
+    etiqueta_control, fuente_control = _etiqueta_control_desde_flags(
+        tiempo_fijo=tiempo_fijo,
+        msg=msg,
+    )
 
     motor = MotorSimulacionProgramatico(
         semilla=config.SEMILLA_ALEATORIA,
@@ -179,6 +205,8 @@ def modo_simulacion_programatica(
         verbose_escenario=verbose_escenario,
         fase_adaptativa=fase_adaptativa,
         perfil_entrenamiento=perfil_cfg.clave,
+        etiqueta_control=etiqueta_control,
+        fuente_control=fuente_control,
     )
     motor.reiniciar(semilla=config.SEMILLA_ALEATORIA)
     t = 0.0

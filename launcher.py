@@ -6,8 +6,10 @@ Ejecutar desde la raíz del proyecto: python launcher.py
 
 from __future__ import annotations
 
+import os
 import subprocess
 import sys
+import threading
 from pathlib import Path
 
 try:
@@ -21,6 +23,8 @@ import config as cfg
 
 RAIZ = Path(__file__).resolve().parent
 MAIN_PY = RAIZ / "main.py"
+SCRIPT_GRAFICAR_MEMBRESIAS = RAIZ / "scripts" / "graficar_membresias.py"
+CARPETA_GRAFICAS = RAIZ / "graficas"
 VENV_PYTHON = RAIZ / "venv" / "Scripts" / "python.exe"
 PYTHON_312_PATHS = (
     Path(r"C:\Users\diego\AppData\Local\Programs\Python\Python312\python.exe"),
@@ -133,21 +137,27 @@ class LauncherApp(tk.Tk):
     def __init__(self) -> None:
         super().__init__()
         self.title("Semáforo inteligente — Menú principal")
-        self.minsize(480, 560)
-        self.geometry("600x700")
+        self.minsize(520, 620)
+        self.geometry("760x760")
 
         self._duracion_comparar_default = float(cfg.DURACION_COMPARAR_DIFUSO_GA)
+        self._imagenes_graficas: list[Path] = []
+        self._grafica_seleccionada: Path | None = None
+        self._proceso_graficas_activo = False
 
         nb = ttk.Notebook(self)
         nb.pack(fill=tk.BOTH, expand=True, padx=8, pady=8)
 
         self._tab_sim = ttk.Frame(nb, padding=8)
         self._tab_reportes = ttk.Frame(nb, padding=8)
+        self._tab_graficas = ttk.Frame(nb, padding=8)
         nb.add(self._tab_sim, text="  Ver el cruce (simulación)  ")
         nb.add(self._tab_reportes, text="  Entrenar y comparar  ")
+        nb.add(self._tab_graficas, text="  Graficas  ")
 
         self._build_tab_sim()
         self._build_tab_reportes()
+        self._build_tab_graficas()
 
         pie = ttk.Frame(self, padding=(8, 0, 8, 8))
         pie.pack(fill=tk.X)
@@ -418,6 +428,92 @@ class LauncherApp(tk.Tk):
             wraplength=520,
         ).pack(fill=tk.X, pady=(8, 0))
 
+    def _build_tab_graficas(self) -> None:
+        f = self._tab_graficas
+
+        lf_acciones = ttk.LabelFrame(f, text="Generar y actualizar", padding=8)
+        lf_acciones.pack(fill=tk.X, pady=(0, 8))
+        ttk.Label(
+            lf_acciones,
+            text=(
+                "Estas acciones reutilizan los comandos oficiales del proyecto "
+                "y refrescan la carpeta graficas/ al terminar."
+            ),
+            wraplength=680,
+        ).pack(anchor=tk.W, pady=(0, 8))
+        ttk.Button(
+            lf_acciones,
+            text="Generar graficas de membresia",
+            command=self._graficas_generar_membresias,
+        ).pack(fill=tk.X, pady=2)
+        ttk.Button(
+            lf_acciones,
+            text="Entrenar GA final y actualizar fitness",
+            command=self._graficas_entrenar_final,
+        ).pack(fill=tk.X, pady=2)
+        ttk.Button(
+            lf_acciones,
+            text="Comparar estrategias y actualizar comparativas",
+            command=self._graficas_comparar_final,
+        ).pack(fill=tk.X, pady=2)
+        ttk.Button(
+            lf_acciones,
+            text="Comparacion completa y actualizar costes",
+            command=self._graficas_comparar_completo_final,
+        ).pack(fill=tk.X, pady=2)
+
+        self.var_estado_graficas = tk.StringVar(
+            value="Listo. Usa esta pestaña para generar, abrir y revisar las imagenes."
+        )
+        ttk.Label(
+            lf_acciones,
+            textvariable=self.var_estado_graficas,
+            wraplength=680,
+            foreground="#1f4f82",
+        ).pack(anchor=tk.W, pady=(10, 0))
+
+        lf_lista = ttk.LabelFrame(f, text="Imagenes disponibles en graficas", padding=8)
+        lf_lista.pack(fill=tk.BOTH, expand=True)
+
+        fila_top = ttk.Frame(lf_lista)
+        fila_top.pack(fill=tk.X, pady=(0, 8))
+        ttk.Button(fila_top, text="Refrescar lista", command=self._refrescar_lista_graficas).pack(side=tk.LEFT)
+        ttk.Button(fila_top, text="Abrir carpeta graficas", command=self._abrir_carpeta_graficas).pack(
+            side=tk.LEFT, padx=6
+        )
+
+        cuerpo = ttk.Frame(lf_lista)
+        cuerpo.pack(fill=tk.BOTH, expand=True)
+        self.listbox_graficas = tk.Listbox(cuerpo, height=12, exportselection=False)
+        self.listbox_graficas.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        scroll = ttk.Scrollbar(cuerpo, orient=tk.VERTICAL, command=self.listbox_graficas.yview)
+        scroll.pack(side=tk.RIGHT, fill=tk.Y)
+        self.listbox_graficas.configure(yscrollcommand=scroll.set)
+        self.listbox_graficas.bind("<<ListboxSelect>>", self._on_select_grafica)
+        self.listbox_graficas.bind("<Double-Button-1>", lambda *_: self._abrir_grafica_seleccionada())
+
+        fila_acciones = ttk.Frame(lf_lista)
+        fila_acciones.pack(fill=tk.X, pady=(8, 0))
+        ttk.Button(
+            fila_acciones,
+            text="Ver en ventana",
+            command=self._visualizar_grafica_seleccionada,
+        ).pack(side=tk.LEFT)
+        ttk.Button(
+            fila_acciones,
+            text="Abrir con visor del sistema",
+            command=self._abrir_grafica_seleccionada,
+        ).pack(side=tk.LEFT, padx=6)
+
+        self.var_grafica_actual = tk.StringVar(value="No hay imagen seleccionada.")
+        ttk.Label(
+            lf_lista,
+            textvariable=self.var_grafica_actual,
+            wraplength=680,
+        ).pack(anchor=tk.W, pady=(10, 0))
+
+        self._refrescar_lista_graficas()
+
     def _perfil_sim_clave(self) -> str:
         return PERFIL_UI_A_CLAVE.get(self.var_perfil_sim.get(), cfg.PERFIL_ENTRENAMIENTO_POR_DEFECTO)
 
@@ -516,6 +612,203 @@ class LauncherApp(tk.Tk):
 
     def _comparar_completo(self) -> None:
         _popen_main(["--modo", "comparar_completo", "--perfil-entrenamiento", self._perfil_train_clave()])
+
+    def _python_cmd_proyecto(self) -> list[str] | None:
+        python_cmd = _resolver_python_proyecto()
+        if python_cmd is None:
+            messagebox.showerror("Python 3.12 requerido", _mensaje_python_312_no_disponible())
+            return None
+        return python_cmd
+
+    def _iniciar_proceso_graficas(self, titulo: str, cmd: list[str]) -> None:
+        if self._proceso_graficas_activo:
+            messagebox.showinfo(
+                "Proceso en curso",
+                "Ya hay una accion de graficas ejecutandose. Espera a que termine para iniciar otra.",
+            )
+            return
+
+        self._proceso_graficas_activo = True
+        self.var_estado_graficas.set(f"Ejecutando: {titulo}...")
+        kw: dict = {"cwd": str(RAIZ)}
+        if sys.platform == "win32":
+            kw["creationflags"] = subprocess.CREATE_NEW_CONSOLE
+        else:
+            kw["start_new_session"] = True
+
+        try:
+            proc = subprocess.Popen(cmd, **kw)
+        except OSError as exc:
+            self._proceso_graficas_activo = False
+            self.var_estado_graficas.set("No se pudo iniciar el proceso.")
+            messagebox.showerror("Error al ejecutar", str(exc))
+            return
+
+        def _esperar() -> None:
+            rc = proc.wait()
+            self.after(0, lambda: self._finalizar_proceso_graficas(titulo, rc))
+
+        threading.Thread(target=_esperar, daemon=True).start()
+
+    def _finalizar_proceso_graficas(self, titulo: str, returncode: int) -> None:
+        self._proceso_graficas_activo = False
+        self._refrescar_lista_graficas()
+        if returncode == 0:
+            self.var_estado_graficas.set(f"Proceso terminado: {titulo}. Lista de imagenes actualizada.")
+            return
+        self.var_estado_graficas.set(f"El proceso finalizo con errores: {titulo}.")
+        messagebox.showwarning(
+            "Proceso finalizado con errores",
+            (
+                f"La accion '{titulo}' termino con codigo {returncode}.\n"
+                "Revisa la consola que se abrio para ver el detalle."
+            ),
+        )
+
+    def _graficas_generar_membresias(self) -> None:
+        python_cmd = self._python_cmd_proyecto()
+        if python_cmd is None:
+            return
+        if not SCRIPT_GRAFICAR_MEMBRESIAS.is_file():
+            messagebox.showerror(
+                "Script no disponible",
+                f"No se encontro el script esperado:\n{SCRIPT_GRAFICAR_MEMBRESIAS}",
+            )
+            return
+        self._iniciar_proceso_graficas(
+            "Graficas de membresia",
+            [*python_cmd, str(SCRIPT_GRAFICAR_MEMBRESIAS)],
+        )
+
+    def _graficas_entrenar_final(self) -> None:
+        python_cmd = self._python_cmd_proyecto()
+        if python_cmd is None:
+            return
+        self._iniciar_proceso_graficas(
+            "Entrenamiento final",
+            [*python_cmd, str(MAIN_PY), "--modo", "entrenar", "--perfil-entrenamiento", "final"],
+        )
+
+    def _graficas_comparar_final(self) -> None:
+        python_cmd = self._python_cmd_proyecto()
+        if python_cmd is None:
+            return
+        self._iniciar_proceso_graficas(
+            "Comparacion final",
+            [*python_cmd, str(MAIN_PY), "--modo", "comparar", "--perfil-entrenamiento", "final"],
+        )
+
+    def _graficas_comparar_completo_final(self) -> None:
+        python_cmd = self._python_cmd_proyecto()
+        if python_cmd is None:
+            return
+        self._iniciar_proceso_graficas(
+            "Comparacion completa final",
+            [*python_cmd, str(MAIN_PY), "--modo", "comparar_completo", "--perfil-entrenamiento", "final"],
+        )
+
+    def _archivos_graficas_disponibles(self) -> list[Path]:
+        if not CARPETA_GRAFICAS.is_dir():
+            return []
+        exts = {".png", ".jpg", ".jpeg", ".gif", ".bmp"}
+        return [
+            p for p in sorted(CARPETA_GRAFICAS.iterdir(), key=lambda x: x.name.lower())
+            if p.is_file() and p.suffix.lower() in exts
+        ]
+
+    def _refrescar_lista_graficas(self) -> None:
+        self._imagenes_graficas = self._archivos_graficas_disponibles()
+        self.listbox_graficas.delete(0, tk.END)
+        self._grafica_seleccionada = None
+        if not self._imagenes_graficas:
+            self.var_grafica_actual.set(
+                f"No hay imagenes en {CARPETA_GRAFICAS}. Genera una grafica desde esta pestaña."
+            )
+            return
+        for ruta in self._imagenes_graficas:
+            self.listbox_graficas.insert(tk.END, ruta.name)
+        self.listbox_graficas.selection_set(0)
+        self.listbox_graficas.activate(0)
+        self._actualizar_grafica_seleccionada_desde_lista()
+
+    def _on_select_grafica(self, _event: object | None = None) -> None:
+        self._actualizar_grafica_seleccionada_desde_lista()
+
+    def _actualizar_grafica_seleccionada_desde_lista(self) -> None:
+        seleccion = self.listbox_graficas.curselection()
+        if not seleccion:
+            if self._imagenes_graficas:
+                self.var_grafica_actual.set("Selecciona una imagen para abrirla o verla.")
+            return
+        idx = int(seleccion[0])
+        if idx < 0 or idx >= len(self._imagenes_graficas):
+            self.var_grafica_actual.set("Selecciona una imagen valida.")
+            return
+        self._grafica_seleccionada = self._imagenes_graficas[idx]
+        self.var_grafica_actual.set(f"Seleccionada: {self._grafica_seleccionada}")
+
+    def _ruta_grafica_seleccionada(self) -> Path | None:
+        self._actualizar_grafica_seleccionada_desde_lista()
+        if self._grafica_seleccionada is None or not self._grafica_seleccionada.is_file():
+            messagebox.showinfo(
+                "Grafica no disponible",
+                "La imagen seleccionada no existe. Refresca la lista o genera las graficas primero.",
+            )
+            return None
+        return self._grafica_seleccionada
+
+    def _abrir_carpeta_graficas(self) -> None:
+        CARPETA_GRAFICAS.mkdir(parents=True, exist_ok=True)
+        try:
+            os.startfile(str(CARPETA_GRAFICAS))
+        except AttributeError:
+            subprocess.Popen(["xdg-open", str(CARPETA_GRAFICAS)], cwd=str(RAIZ))
+        except OSError as exc:
+            messagebox.showerror("No se pudo abrir la carpeta", str(exc))
+
+    def _abrir_grafica_seleccionada(self) -> None:
+        ruta = self._ruta_grafica_seleccionada()
+        if ruta is None:
+            return
+        try:
+            os.startfile(str(ruta))
+        except AttributeError:
+            subprocess.Popen(["xdg-open", str(ruta)], cwd=str(RAIZ))
+        except OSError as exc:
+            messagebox.showerror("No se pudo abrir la imagen", str(exc))
+
+    def _visualizar_grafica_seleccionada(self) -> None:
+        ruta = self._ruta_grafica_seleccionada()
+        if ruta is None:
+            return
+        try:
+            img = tk.PhotoImage(file=str(ruta))
+        except tk.TclError:
+            messagebox.showinfo(
+                "Vista rapida no disponible",
+                "No pude mostrar la imagen dentro del launcher. Usa el visor del sistema.",
+            )
+            return
+
+        w_max, h_max = 880, 620
+        factor_w = max(1, (img.width() + w_max - 1) // w_max)
+        factor_h = max(1, (img.height() + h_max - 1) // h_max)
+        factor = max(factor_w, factor_h)
+        if factor > 1:
+            img = img.subsample(factor, factor)
+
+        top = tk.Toplevel(self)
+        top.title(f"Vista rapida - {ruta.name}")
+        top.transient(self)
+        top.img_ref = img
+        top.geometry(
+            f"{min(w_max + 40, max(420, img.width() + 24))}x"
+            f"{min(h_max + 90, max(320, img.height() + 70))}"
+        )
+
+        ttk.Label(top, text=ruta.name).pack(anchor=tk.W, padx=10, pady=(10, 4))
+        ttk.Label(top, image=img).pack(fill=tk.BOTH, expand=True, padx=10, pady=4)
+        ttk.Label(top, text=str(ruta), wraplength=w_max).pack(anchor=tk.W, padx=10, pady=(0, 10))
 
 
 def main() -> int:

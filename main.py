@@ -297,7 +297,10 @@ def modo_comparar_completo(perfil_entrenamiento: str) -> None:
             f"Aviso: no existe {perfil_cfg.archivo_mejor_cromosoma.name}; la comparación será solo "
             "'fijo' vs 'difuso base'. Ejecuta antes: python main.py --modo entrenar"
         )
-    print(f"Escenario tráfico: {config.ESCENARIO_COMPARAR_COMPLETO} | Semilla: {config.SEED_COMPARACION}")
+    print("Comparación completa robusta:")
+    print(f"  Escenarios: {config.ESCENARIOS_COMPARACION_COMPLETA}")
+    print(f"  Semillas: {config.SEEDS_COMPARACION_COMPLETA}")
+    print(f"  Duración por corrida: {config.DURACION_ESCENARIO_COMPARACION:.1f} s")
     resultados = ejecutar_comparacion(perfil_entrenamiento=perfil_cfg.clave)
     for r in resultados:
         print(f"\n=== {r.nombre} ===")

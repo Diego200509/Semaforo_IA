@@ -134,32 +134,80 @@ def ejecutar_comparacion(
     escenario: str | None = None,
     perfil_entrenamiento: str | None = None,
 ) -> List[ResultadoEscenario]:
-    """Una semilla; tres políticas. Usado por `comparar_completo`."""
-    semilla = semilla if semilla is not None else config.SEED_COMPARACION
+    """
+    Comparación resumida para `comparar_completo`.
+
+    Si el llamador fuerza `semilla` o `escenario`, se conserva la corrida simple.
+    Si no, se usa un resumen más robusto: promedio en varias semillas y escenarios.
+    """
     duracion = duracion if duracion is not None else config.DURACION_ESCENARIO_COMPARACION
     dt = dt if dt is not None else config.DT_SIMULACION_RAPIDA
-    esc = (escenario or config.ESCENARIO_COMPARAR_COMPLETO).strip().lower()
+    corrida_simple = (semilla is not None) or (escenario is not None)
+    semillas = [int(semilla)] if semilla is not None else list(config.SEEDS_COMPARACION_COMPLETA)
+    escenarios = (
+        [(escenario or config.ESCENARIO_COMPARAR_COMPLETO).strip().lower()]
+        if corrida_simple
+        else [str(e).strip().lower() for e in config.ESCENARIOS_COMPARACION_COMPLETA]
+    )
 
     resultados: List[ResultadoEscenario] = []
 
-    m_fijo = _simular_fijo(semilla, duracion, dt, esc, duracion, perfil_entrenamiento)
+    mats_fijo = [
+        _simular_fijo(s, duracion, dt, esc, duracion, perfil_entrenamiento)
+        for esc in escenarios
+        for s in semillas
+    ]
     resultados.append(
-        ResultadoEscenario("Tiempo fijo", m_fijo, coste_desde_metricas(m_fijo))
+        ResultadoEscenario(
+            "Tiempo fijo",
+            promediar_metricas(mats_fijo),
+            sum(coste_desde_metricas(m) for m in mats_fijo) / len(mats_fijo),
+        )
     )
 
-    ctrl_base = ControladorDifuso(parametros_por_defecto())
-    m_dif = _simular_difuso(semilla, duracion, dt, ctrl_base, esc, duracion, perfil_entrenamiento)
+    mats_base = [
+        _simular_difuso(
+            s,
+            duracion,
+            dt,
+            ControladorDifuso(parametros_por_defecto()),
+            esc,
+            duracion,
+            perfil_entrenamiento,
+        )
+        for esc in escenarios
+        for s in semillas
+    ]
     resultados.append(
-        ResultadoEscenario("Difuso (base)", m_dif, coste_desde_metricas(m_dif))
+        ResultadoEscenario(
+            "Difuso (base)",
+            promediar_metricas(mats_base),
+            sum(coste_desde_metricas(m) for m in mats_base) / len(mats_base),
+        )
     )
 
     ruta_crom = _ruta_cromosoma_entrenado(perfil_entrenamiento)
     if ruta_crom.is_file():
         crom = Cromosoma.cargar_json(ruta_crom)
-        ctrl_opt = ControladorDifuso(crom.decodificar())
-        m_opt = _simular_difuso(semilla, duracion, dt, ctrl_opt, esc, duracion, perfil_entrenamiento)
+        mats_ga = [
+            _simular_difuso(
+                s,
+                duracion,
+                dt,
+                ControladorDifuso(crom.decodificar()),
+                esc,
+                duracion,
+                perfil_entrenamiento,
+            )
+            for esc in escenarios
+            for s in semillas
+        ]
         resultados.append(
-            ResultadoEscenario("Difuso + GA", m_opt, coste_desde_metricas(m_opt))
+            ResultadoEscenario(
+                "Difuso + GA",
+                promediar_metricas(mats_ga),
+                sum(coste_desde_metricas(m) for m in mats_ga) / len(mats_ga),
+            )
         )
 
     return resultados

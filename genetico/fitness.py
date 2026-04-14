@@ -15,6 +15,8 @@ def _normalizar_metricas(metricas: dict) -> dict[str, float]:
     espera_max = float(metricas.get("tiempo_espera_maximo", 0.0))
     cola_max = float(metricas.get("longitud_cola_maxima", 0.0))
     demora_promedio = float(metricas.get("demora_promedio_por_vehiculo", 0.0))
+    deseq_espera = float(metricas.get("desequilibrio_espera_ejes", 0.0))
+    deseq_cola = float(metricas.get("desequilibrio_cola_ejes", 0.0))
     atendidos = float(metricas.get("vehiculos_atendidos", 0.0))
 
     esp_n = min(1.0, espera / max(1e-6, config.ESPERA_MAX_UNIVERSO))
@@ -22,6 +24,8 @@ def _normalizar_metricas(metricas: dict) -> dict[str, float]:
     espera_max_n = min(1.0, espera_max / max(1e-6, config.ESPERA_MAX_UNIVERSO))
     cola_max_n = min(1.0, cola_max / max(1e-6, config.COLA_MAX_UNIVERSO))
     demora_promedio_n = min(1.0, demora_promedio / max(1e-6, config.ESPERA_MAX_UNIVERSO))
+    deseq_espera_n = min(1.0, deseq_espera / max(1e-6, config.ESPERA_MAX_UNIVERSO))
+    deseq_cola_n = min(1.0, deseq_cola / max(1e-6, config.COLA_MAX_UNIVERSO))
     t_sim = max(1e-6, float(metricas.get("tiempo_simulado", 1.0)))
     ritmo = atendidos / t_sim
     atend_n = min(1.0, ritmo / 1.2)
@@ -31,6 +35,8 @@ def _normalizar_metricas(metricas: dict) -> dict[str, float]:
         "espera_maxima": espera_max_n,
         "cola_maxima": cola_max_n,
         "demora_promedio_por_vehiculo": demora_promedio_n,
+        "desequilibrio_espera_ejes": deseq_espera_n,
+        "desequilibrio_cola_ejes": deseq_cola_n,
         "throughput": atend_n,
     }
 
@@ -43,6 +49,8 @@ def coste_desde_metricas(metricas: dict) -> float:
         + config.PESO_TIEMPO_ESPERA_MAXIMA * normalizadas["espera_maxima"]
         + config.PESO_COLA_MAXIMA * normalizadas["cola_maxima"]
         + config.PESO_DEMORA_PROMEDIO_POR_VEHICULO * normalizadas["demora_promedio_por_vehiculo"]
+        + config.PESO_DESEQUILIBRIO_ESPERA_EJES * normalizadas["desequilibrio_espera_ejes"]
+        + config.PESO_DESEQUILIBRIO_COLA_EJES * normalizadas["desequilibrio_cola_ejes"]
         - config.PESO_VEHICULOS_ATENDIDOS * normalizadas["throughput"]
     )
 

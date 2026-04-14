@@ -256,13 +256,16 @@ DURACION_EVALUACION_FITNESS = 120.0
 DT_SIMULACION_RAPIDA = 0.25
 
 # Pesos de la función fitness compuesta (minimizar espera y cola; maximizar atendidos).
-PESO_TIEMPO_ESPERA = 0.5
-PESO_LONGITUD_COLA = 0.3
-PESO_VEHICULOS_ATENDIDOS = 0.2
+# Ajustados para premiar control adaptativo real sin abandonar la interpretabilidad.
+PESO_TIEMPO_ESPERA = 0.42
+PESO_LONGITUD_COLA = 0.26
+PESO_VEHICULOS_ATENDIDOS = 0.28
 # Penalizaciones suaves para evitar soluciones buenas "en promedio" pero injustas.
-PESO_TIEMPO_ESPERA_MAXIMA = 0.18
+PESO_TIEMPO_ESPERA_MAXIMA = 0.16
 PESO_COLA_MAXIMA = 0.10
-PESO_DEMORA_PROMEDIO_POR_VEHICULO = 0.12
+PESO_DEMORA_PROMEDIO_POR_VEHICULO = 0.10
+PESO_DESEQUILIBRIO_ESPERA_EJES = 0.14
+PESO_DESEQUILIBRIO_COLA_EJES = 0.08
 
 # Archivo donde se guarda el mejor cromosoma tras entrenar.
 ARCHIVO_MEJOR_CROMOSOMA = obtener_perfil_entrenamiento("final").archivo_mejor_cromosoma
@@ -281,6 +284,9 @@ DURACION_ESCENARIO_COMPARACION = 180.0
 DURACION_COMPARAR_DIFUSO_GA = 120.0
 # Semillas para `comparar` (promedio por estrategia).
 SEEDS_COMPARACION_MULTISEMILLA = [1, 7, 15, 23, 42]
+# Resumen robusto para `comparar_completo`: varias semillas y varios escenarios.
+SEEDS_COMPARACION_COMPLETA = [1, 7, 15, 23, 42]
+ESCENARIOS_COMPARACION_COMPLETA = ("bajo", "pico", "desbalanceado", "mixto")
 # Entrenamiento GA: perfil de tráfico fijo durante evaluación de fitness.
 ESCENARIO_ENTRENAMIENTO_GA = "bajo"
 
@@ -291,5 +297,5 @@ ARCHIVO_GRAFICA_COMPARAR_GA = CARPETA_GRAFICAS / "comparacion_sin_ga_vs_ga.png"
 ARCHIVO_GRAFICA_ESTRATEGIAS_PROMEDIO = CARPETA_GRAFICAS / "comparacion_estrategias_promedio.png"
 ARCHIVO_GRAFICA_POR_ESCENARIO = CARPETA_GRAFICAS / "comparacion_por_escenario.png"
 
-# Escenario usado en `comparar_completo` (una semilla, coste compuesto; retrocompatibilidad).
-ESCENARIO_COMPARAR_COMPLETO = "bajo"
+# Escenario usado en `comparar_completo` cuando se fuerza una sola corrida.
+ESCENARIO_COMPARAR_COMPLETO = "mixto"

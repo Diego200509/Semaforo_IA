@@ -35,20 +35,28 @@ class ControladorDifuso:
         self._reconstruir_funciones()
 
     def _normalizar_entradas(self, estado: Mapping[str, float]) -> tuple[float, float, float]:
-        dens_raw = estado.get("densidad_ponderada", estado.get("densidad_vehicular", 0.0))
-        dens = float(np.clip(float(dens_raw), 0.0, 1.0))
         eje = estado.get("inferir_para_grupo_ns", None)
         if eje is True:
+            dens_raw = estado.get(
+                "densidad_ponderada_ns",
+                estado.get("densidad_ns", estado.get("densidad_ponderada", estado.get("densidad_vehicular", 0.0))),
+            )
             cola_preverde = estado.get("cola_ns_preverde", None)
             cola = float(cola_preverde if cola_preverde is not None else estado.get("cola_ns", 0.0))
             esp = float(estado.get("espera_ns", estado.get("tiempo_espera_promedio", 0.0)))
         elif eje is False:
+            dens_raw = estado.get(
+                "densidad_ponderada_ew",
+                estado.get("densidad_ew", estado.get("densidad_ponderada", estado.get("densidad_vehicular", 0.0))),
+            )
             cola_preverde = estado.get("cola_ew_preverde", None)
             cola = float(cola_preverde if cola_preverde is not None else estado.get("cola_ew", 0.0))
             esp = float(estado.get("espera_ew", estado.get("tiempo_espera_promedio", 0.0)))
         else:
+            dens_raw = estado.get("densidad_ponderada", estado.get("densidad_vehicular", 0.0))
             esp = float(estado.get("tiempo_espera_promedio", 0.0))
             cola = float(estado.get("longitud_cola", 0.0))
+        dens = float(np.clip(float(dens_raw), 0.0, 1.0))
         esp_n = float(np.clip(esp / max(1e-6, config.ESPERA_MAX_UNIVERSO), 0.0, 1.0))
         cola_n = float(np.clip(cola / max(1e-6, config.COLA_MAX_UNIVERSO), 0.0, 1.0))
         return dens, esp_n, cola_n

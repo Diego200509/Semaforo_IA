@@ -75,6 +75,13 @@ class Interseccion:
         self.suma_vehiculos_detenidos_muestras = 0.0
         self.muestras_detenidos = 0
         self.suma_demora_vehiculos_atendidos = 0.0
+        self.suma_espera_ns_muestras = 0.0
+        self.suma_espera_ew_muestras = 0.0
+        self.suma_cola_ns_muestras = 0.0
+        self.suma_cola_ew_muestras = 0.0
+        self.muestras_ejes = 0
+        self.vehiculos_atendidos_ns = 0
+        self.vehiculos_atendidos_ew = 0
 
         self._intervalo_spawn = float(config.INTERVALO_SPAWN_BASE)
         self._mitad_via = float(getattr(config, "MITAD_ANCHO_VIA", 55.0))
@@ -116,6 +123,13 @@ class Interseccion:
         self.suma_vehiculos_detenidos_muestras = 0.0
         self.muestras_detenidos = 0
         self.suma_demora_vehiculos_atendidos = 0.0
+        self.suma_espera_ns_muestras = 0.0
+        self.suma_espera_ew_muestras = 0.0
+        self.suma_cola_ns_muestras = 0.0
+        self.suma_cola_ew_muestras = 0.0
+        self.muestras_ejes = 0
+        self.vehiculos_atendidos_ns = 0
+        self.vehiculos_atendidos_ew = 0
         self._historial_segmentos = []
         self._seg_etiqueta = ""
         self._seg_t0 = 0.0
@@ -610,6 +624,10 @@ class Interseccion:
                 v.cruzo = True
                 self.vehiculos_atendidos += 1
                 self._seg_atendidos += 1
+                if self._es_grupo_ns(v.direccion):
+                    self.vehiculos_atendidos_ns += 1
+                else:
+                    self.vehiculos_atendidos_ew += 1
                 # Conserva la demora real por vehículo atendido para castigar esperas largas aisladas.
                 self.suma_demora_vehiculos_atendidos += float(v.tiempo_espera)
                 continue
@@ -675,6 +693,11 @@ class Interseccion:
         self.muestras_espera += 1
         self.suma_longitud_cola_muestras += estado["longitud_cola"]
         self.muestras_cola += 1
+        self.suma_espera_ns_muestras += float(estado["espera_ns"])
+        self.suma_espera_ew_muestras += float(estado["espera_ew"])
+        self.suma_cola_ns_muestras += float(estado["cola_ns"])
+        self.suma_cola_ew_muestras += float(estado["cola_ew"])
+        self.muestras_ejes += 1
         # La cola máxima complementa el promedio y ayuda a detectar picos de congestión.
         self.max_longitud_cola_observada = max(
             self.max_longitud_cola_observada,
@@ -707,6 +730,20 @@ class Interseccion:
             suma_peso / max(1e-6, float(config.CAPACIDAD_REFERENCIA_VEHICULOS)),
         )
 
+        cap_eje = max(1e-6, float(config.CAPACIDAD_REFERENCIA_VEHICULOS) / 2.0)
+        activos_ns = [v for v in activos if self._es_grupo_ns(v.direccion)]
+        activos_ew = [v for v in activos if not self._es_grupo_ns(v.direccion)]
+        densidad_ns = min(1.0, len(activos_ns) / cap_eje)
+        densidad_ew = min(1.0, len(activos_ew) / cap_eje)
+        densidad_ponderada_ns = min(
+            1.0,
+            sum(v.peso_congestion_efectivo() for v in activos_ns) / cap_eje,
+        )
+        densidad_ponderada_ew = min(
+            1.0,
+            sum(v.peso_congestion_efectivo() for v in activos_ew) / cap_eje,
+        )
+
         cola_ns, cola_ew, espera_ns, espera_ew = self._esperas_y_colas_por_eje(activos)
         longitud_cola = float(max(cola_ns, cola_ew))
 
@@ -716,6 +753,10 @@ class Interseccion:
         return {
             "densidad_vehicular": float(densidad),
             "densidad_ponderada": float(densidad_ponderada),
+            "densidad_ns": float(densidad_ns),
+            "densidad_ew": float(densidad_ew),
+            "densidad_ponderada_ns": float(densidad_ponderada_ns),
+            "densidad_ponderada_ew": float(densidad_ponderada_ew),
             "tiempo_espera_promedio": tiempo_espera_promedio,
             "longitud_cola": longitud_cola,
             "cola_ns": float(cola_ns),
@@ -758,16 +799,38 @@ class Interseccion:
             if self.vehiculos_atendidos
             else 0.0
         )
+        prom_espera_ns = (
+            self.suma_espera_ns_muestras / self.muestras_ejes if self.muestras_ejes else 0.0
+        )
+        prom_espera_ew = (
+            self.suma_espera_ew_muestras / self.muestras_ejes if self.muestras_ejes else 0.0
+        )
+        prom_cola_ns = (
+            self.suma_cola_ns_muestras / self.muestras_ejes if self.muestras_ejes else 0.0
+        )
+        prom_cola_ew = (
+            self.suma_cola_ew_muestras / self.muestras_ejes if self.muestras_ejes else 0.0
+        )
+        deseq_espera = abs(prom_espera_ns - prom_espera_ew)
+        deseq_cola = abs(prom_cola_ns - prom_cola_ew)
         m = {
             "tiempo_espera_promedio_muestras": prom_espera,
             "longitud_cola_promedio_muestras": prom_cola,
             "vehiculos_atendidos": float(self.vehiculos_atendidos),
+            "vehiculos_atendidos_ns": float(self.vehiculos_atendidos_ns),
+            "vehiculos_atendidos_ew": float(self.vehiculos_atendidos_ew),
             "tiempo_simulado": self.tiempo_simulado,
             "tiempo_espera_maximo": float(self.max_tiempo_espera_observado),
             "longitud_cola_maxima": float(self.max_longitud_cola_observada),
             "vehiculos_detenidos_promedio_muestras": prom_det,
             "demora_total_vehiculos_atendidos": float(self.suma_demora_vehiculos_atendidos),
             "demora_promedio_por_vehiculo": float(demora_promedio),
+            "tiempo_espera_promedio_ns_muestras": float(prom_espera_ns),
+            "tiempo_espera_promedio_ew_muestras": float(prom_espera_ew),
+            "cola_promedio_ns_muestras": float(prom_cola_ns),
+            "cola_promedio_ew_muestras": float(prom_cola_ew),
+            "desequilibrio_espera_ejes": float(deseq_espera),
+            "desequilibrio_cola_ejes": float(deseq_cola),
             "throughput": throughput,
         }
         if self._historial_segmentos:

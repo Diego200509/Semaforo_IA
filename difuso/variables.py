@@ -48,9 +48,10 @@ def aplicar_trimf(
     universo: np.ndarray, puntos: Tuple[float, float, float, float, float]
 ) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
     a, b, c, d, e = puntos
-    bajo = trimf(universo, a, b, c)
+    # Extremos con "hombro" para no perder activación al saturar en 0 o 1.
+    bajo = fuzz.trapmf(universo, [a, a, b, c])
     medio = trimf(universo, b, c, d)
-    alto = trimf(universo, c, d, e)
+    alto = fuzz.trapmf(universo, [c, d, e, e])
     return bajo, medio, alto
 
 
@@ -60,5 +61,6 @@ def interp_membresia(universo: np.ndarray, mf: np.ndarray, x: float) -> float:
 
 def defuzz_centroide(universo: np.ndarray, agregado: np.ndarray) -> float:
     if float(np.max(agregado)) < 1e-9:
-        return 0.45
+        # Fallback conservador: cercano al ciclo fijo de referencia y no a un verde excesivo.
+        return 0.30
     return float(fuzz.defuzz(universo, agregado, "centroid"))

@@ -357,7 +357,7 @@ class MotorSimulacionPygame(MotorSimulacionProgramatico):
         contorno = tuple(getattr(config, "HUD_METRICAS_CONTORNO", (255, 255, 255)))
         grosor = int(getattr(config, "HUD_METRICAS_CONTORNO_GROSOR", 1))
         pad = int(getattr(config, "HUD_PANEL_PADDING", 10))
-        line_gap = 4
+        line_gap = int(getattr(config, "HUD_PANEL_LINE_GAP", 4))
         x0, y0 = 6, 6
 
         surfs = [self._render_texto_metrica(t, color_fg, contorno, grosor) for t in lineas]
@@ -570,8 +570,10 @@ class MotorSimulacionPygame(MotorSimulacionProgramatico):
         info = self.obtener_info_control()
         lineas = [
             f"Modo: {info['modo']}",
-            f"Fuente: {info['fuente']} | Eje activo: {info['eje_activo']}",
-            f"Verde programado: {info['duracion_verde_actual']:.2f} s | Restante fase: {info['tiempo_restante_fase']:.2f} s",
+            f"Fuente: {info['fuente']}",
+            f"Eje activo: {info['eje_activo']}",
+            f"Verde programado: {info['duracion_verde_actual']:.2f} s",
+            f"Restante fase: {info['tiempo_restante_fase']:.2f} s",
             f"Densidad: {estado['densidad_vehicular']:.2f}",
             f"Espera prom.: {estado['tiempo_espera_promedio']:.1f} s",
             f"Cola max.: {estado['longitud_cola']:.0f}",

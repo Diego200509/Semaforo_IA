@@ -1,9 +1,3 @@
-"""
-Menú gráfico para lanzar simulación, entrenamiento y reportes sin escribir la CLI.
-
-Ejecutar desde la raíz del proyecto: python launcher.py
-"""
-
 from __future__ import annotations
 
 import os
@@ -15,7 +9,7 @@ from pathlib import Path
 try:
     import tkinter as tk
     from tkinter import ttk, messagebox
-except ImportError as e:  # pragma: no cover
+except ImportError as e:
     print("Tkinter no está disponible en este Python. Instala python3-tk o use la CLI: python main.py --help")
     raise SystemExit(1) from e
 
@@ -52,10 +46,6 @@ def _probar_comando_python(cmd: list[str]) -> bool:
 
 
 def _resolver_python_proyecto() -> list[str] | None:
-    """
-    El proyecto prioriza Python 3.12 porque el entorno virtual y dependencias fueron
-    preparados para esa versión.
-    """
     if VENV_PYTHON.is_file() and _probar_comando_python([str(VENV_PYTHON)]):
         return [str(VENV_PYTHON)]
     if _probar_comando_python(["py", "-3.12"]):
@@ -90,49 +80,6 @@ def _popen_main(args: list[str]) -> None:
     subprocess.Popen(cmd, **kw)
 
 
-def _validar_opciones_sim(
-    *,
-    usar_default: bool,
-    usar_ga: bool,
-    adaptacion_banco: bool,
-    tiempo_fijo: bool,
-) -> str | None:
-    # Red de seguridad (el menú suele impedir estas mezclas al marcar).
-    if tiempo_fijo and (usar_default or usar_ga or adaptacion_banco):
-        return "Con “semáforo clásico” no aplica el difuso: quita las otras tres opciones de reglas."
-    n = int(usar_default) + int(usar_ga) + int(adaptacion_banco)
-    if n > 1:
-        return "Solo puedes elegir una fuente de reglas: estándar, entrenamiento GA o banco (o ninguna = automático)."
-    return None
-
-
-def _args_sim_base(
-    escenario: str,
-    *,
-    perfil_entrenamiento: str,
-    usar_default: bool,
-    usar_ga: bool,
-    adaptacion_banco: bool,
-    tiempo_fijo: bool,
-    verbose_escenario: bool,
-    no_fase_adaptativa: bool,
-) -> list[str]:
-    args: list[str] = ["--escenario", escenario, "--perfil-entrenamiento", perfil_entrenamiento]
-    if usar_default:
-        args.append("--usar-default")
-    if usar_ga:
-        args.append("--usar-ga")
-    if adaptacion_banco:
-        args.append("--adaptacion-banco")
-    if tiempo_fijo:
-        args.append("--tiempo-fijo")
-    if verbose_escenario:
-        args.append("--verbose-escenario")
-    if no_fase_adaptativa:
-        args.append("--no-fase-adaptativa")
-    return args
-
-
 class LauncherApp(tk.Tk):
     def __init__(self) -> None:
         super().__init__()
@@ -162,91 +109,6 @@ class LauncherApp(tk.Tk):
         pie = ttk.Frame(self, padding=(8, 0, 8, 8))
         pie.pack(fill=tk.X)
         ttk.Button(pie, text="Cerrar menú", command=self.destroy).pack(side=tk.RIGHT)
-
-    def _enlazar_exclusiones_control_semaforo(self) -> None:
-        """Alineado con main.py: una sola fuente difusa (o ninguna) y semáforo fijo excluye el difuso."""
-        self._mutuo_control = False
-
-        def on_default(*_: object) -> None:
-            if self._mutuo_control or not self.var_default.get():
-                return
-            self._mutuo_control = True
-            try:
-                self.var_ga.set(False)
-                self.var_banco.set(False)
-                self.var_tiempo_fijo.set(False)
-            finally:
-                self._mutuo_control = False
-
-        def on_ga(*_: object) -> None:
-            if self._mutuo_control or not self.var_ga.get():
-                return
-            self._mutuo_control = True
-            try:
-                self.var_default.set(False)
-                self.var_banco.set(False)
-                self.var_tiempo_fijo.set(False)
-            finally:
-                self._mutuo_control = False
-
-        def on_banco(*_: object) -> None:
-            if self._mutuo_control or not self.var_banco.get():
-                return
-            self._mutuo_control = True
-            try:
-                self.var_default.set(False)
-                self.var_ga.set(False)
-                self.var_tiempo_fijo.set(False)
-            finally:
-                self._mutuo_control = False
-
-        def on_tiempo_fijo(*_: object) -> None:
-            if self._mutuo_control or not self.var_tiempo_fijo.get():
-                return
-            self._mutuo_control = True
-            try:
-                self.var_default.set(False)
-                self.var_ga.set(False)
-                self.var_banco.set(False)
-            finally:
-                self._mutuo_control = False
-
-        self.var_default.trace_add("write", on_default)
-        self.var_ga.trace_add("write", on_ga)
-        self.var_banco.trace_add("write", on_banco)
-        self.var_tiempo_fijo.trace_add("write", on_tiempo_fijo)
-
-    def _refrescar_nota_opciones(self) -> None:
-        """Una o dos frases cortas según lo marcado; evita el bloque de texto fijo largo."""
-        if not hasattr(self, "lbl_nota_opciones"):
-            return
-        perfil = cfg.obtener_perfil_entrenamiento(self._perfil_sim_clave())
-        partes: list[str] = []
-        if self.var_tiempo_fijo.get():
-            partes.append("Semáforo fijo: sin difuso. Las otras tres opciones de reglas quedan desmarcadas.")
-        elif self.var_banco.get():
-            partes.append(
-                f"Banco activo [{perfil.etiqueta_ui}]: el difuso usa {perfil.archivo_banco_cromosomas.name}."
-            )
-        elif self.var_ga.get():
-            partes.append(
-                f"GA activo [{perfil.etiqueta_ui}]: se cargará {perfil.archivo_mejor_cromosoma.name}."
-            )
-        elif self.var_default.get():
-            partes.append("Reglas difusas estándar: no se usan archivos de entrenamiento.")
-        else:
-            partes.append(
-                f"Automático [{perfil.etiqueta_ui}]: si existe {perfil.archivo_mejor_cromosoma.name} se usa; si no, reglas estándar."
-            )
-        extra: list[str] = []
-        if self.var_verbose.get():
-            extra.append("Consola: ver cambios de tráfico (útil con escenario «mixto»).")
-        if self.var_no_adapt.get():
-            extra.append("Ciclo entre ejes sin prioridad por colas largas.")
-        texto = " ".join(partes)
-        if extra:
-            texto = f"{texto} {' '.join(extra)}"
-        self.lbl_nota_opciones.configure(text=texto)
 
     def _build_tab_sim(self) -> None:
         f = self._tab_sim
@@ -327,11 +189,6 @@ class LauncherApp(tk.Tk):
             lf_run,
             text="Entrenar modelo",
             command=self._entrenar,
-        ).pack(fill=tk.X, pady=2)
-        ttk.Button(
-            lf_run,
-            text="Entrenar múltiples configuraciones",
-            command=self._entrenar_banco,
         ).pack(fill=tk.X, pady=2)
 
         lf_out = ttk.LabelFrame(f, text="Resultados", padding=8)
@@ -432,7 +289,6 @@ class LauncherApp(tk.Tk):
         self.lbl_nota_perfil_train.configure(
             text=(
                 f"Cromosoma: {perfil.archivo_mejor_cromosoma.name}\n"
-                f"Banco: {perfil.archivo_banco_cromosomas.name}\n"
                 f"Gráfica esperada: {cfg.CARPETA_GRAFICAS.name}/evolucion_fitness_{perfil.clave}.png"
             )
         )
@@ -484,10 +340,7 @@ class LauncherApp(tk.Tk):
             "perfil_entrenamiento": self._perfil_sim_clave(),
             "usar_default": modo == "difuso_base",
             "usar_ga": modo == "ga",
-            "adaptacion_banco": False,
             "tiempo_fijo": modo == "fijo",
-            "verbose_escenario": False,
-            "no_fase_adaptativa": False,
         }
         return esc, d
 
@@ -504,9 +357,6 @@ class LauncherApp(tk.Tk):
 
     def _entrenar(self) -> None:
         _popen_main(["--modo", "entrenar", "--perfil-entrenamiento", self._perfil_train_clave()])
-
-    def _entrenar_banco(self) -> None:
-        _popen_main(["--modo", "entrenar_banco", "--perfil-entrenamiento", self._perfil_train_clave()])
 
     def _comparar(self) -> None:
         self._graficas_comparar_final()

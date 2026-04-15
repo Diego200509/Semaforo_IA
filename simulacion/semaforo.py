@@ -1,7 +1,3 @@
-"""
-Control de fases del sem?foro NS/EW con modo adaptativo (Fase 2).
-"""
-
 from __future__ import annotations
 
 from enum import Enum, auto

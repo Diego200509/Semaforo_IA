@@ -1,4 +1,3 @@
-"""Métricas, gráficas y comparación de estrategias de control."""
 
 from evaluacion.comparacion import (
     ResultadoComparacionDifusoGA,

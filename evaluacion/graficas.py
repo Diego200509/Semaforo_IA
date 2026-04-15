@@ -1,7 +1,3 @@
-"""
-Visualización con Matplotlib. Las importaciones son perezosas para que otros modos
-(p. ej. sim_prog) puedan ejecutarse aunque falle la carga de DLLs gráficas en el SO.
-"""
 
 from __future__ import annotations
 
@@ -30,7 +26,6 @@ def graficar_evolucion_fitness(
     ruta_salida: Path | None = None,
     mostrar: bool = False,
 ) -> None:
-    """Serie del mejor fitness por generación."""
     plt = _pyplot()
     ruta_salida = _preparar_ruta_salida(ruta_salida or config.ARCHIVO_GRAFICA_EVOLUCION_FITNESS)
     plt.figure(figsize=(8, 4))
@@ -52,9 +47,6 @@ def graficar_barras_comparacion(
     ruta_salida: Path | None = None,
     mostrar: bool = False,
 ) -> None:
-    """
-    Compara estrategias mediante el coste compuesto (menor es mejor).
-    """
     plt = _pyplot()
     colores = ["#5c7cfa", "#51cf66", "#ff922b", "#cc5de8"]
     ruta_salida = _preparar_ruta_salida(ruta_salida or config.ARCHIVO_GRAFICA_COMPARACION_COSTES)
@@ -80,12 +72,6 @@ def graficar_comparacion_sin_ga_vs_ga(
     ruta_salida: Path | None = None,
     mostrar: bool = False,
 ) -> None:
-    """
-    Barras agrupadas por métrica (espera, cola, atendidos).
-
-    Las alturas se normalizan por métrica al máximo entre ambos casos (100 % = mayor valor),
-    para que las tres métricas se lean en un solo gráfico; encima de cada barra se anota el valor real.
-    """
     import numpy as np
 
     plt = _pyplot()
@@ -183,10 +169,6 @@ def graficar_estrategias_promedio_multimetrica(
     ruta_salida: Path | None = None,
     mostrar: bool = False,
 ) -> None:
-    """
-    Barras agrupadas: eje X = métricas promedio, grupos = estrategias.
-    `resultados`: objetos con `.nombre` y `.metricas_promedio`.
-    """
     import numpy as np
 
     plt = _pyplot()
@@ -247,10 +229,6 @@ def graficar_comparacion_por_escenario(
     ruta_salida: Path | None = None,
     mostrar: bool = False,
 ) -> None:
-    """
-    `datos`: escenario -> estrategia -> métricas promedio.
-    Dos subplots: espera promedio y coste compuesto.
-    """
     import numpy as np
 
     from genetico.fitness import coste_desde_metricas

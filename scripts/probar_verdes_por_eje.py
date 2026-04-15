@@ -1,25 +1,15 @@
-"""
-Ejemplo: imprime cada vez que arranca un verde NS o EW, la duración asignada por el difuso
-y las colas / esperas por eje (prueba la lógica inferir_para_grupo_ns).
-
-Uso (desde la raíz del proyecto):
-    python scripts/probar_verdes_por_eje.py
-    python scripts/probar_verdes_por_eje.py --escenario pico --segundos 90
-"""
-
 from __future__ import annotations
 
 import argparse
 import sys
 from pathlib import Path
 
-# Raíz del proyecto (padre de scripts/)
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-import config  # noqa: E402
-from difuso.controlador import ControladorDifuso  # noqa: E402
-from simulacion.entorno import MotorSimulacionProgramatico  # noqa: E402
-from simulacion.semaforo import FaseSemaforo  # noqa: E402
+import config  
+from difuso.controlador import ControladorDifuso  
+from simulacion.entorno import MotorSimulacionProgramatico  
+from simulacion.semaforo import FaseSemaforo  
 
 
 def main() -> None:

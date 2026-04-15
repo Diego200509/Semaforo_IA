@@ -1,5 +1,3 @@
-"""Tipos de vehículo (Fase 2): velocidad, tamaño y peso en congestión."""
-
 from __future__ import annotations
 
 from dataclasses import dataclass

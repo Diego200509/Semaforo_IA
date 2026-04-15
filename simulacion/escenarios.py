@@ -1,9 +1,3 @@
-"""
-Perfiles de generación de tráfico (solo afectan aparición de vehículos, no al difuso ni al GA).
-
-Incluye escenarios estáticos (bajo, pico, desbalanceado) y modo mixto por tramos de tiempo.
-"""
-
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -24,7 +18,6 @@ def _pesos_equilibrados() -> Dict[DireccionMovimiento, float]:
 
 
 def _pesos_ns_dominante() -> Dict[DireccionMovimiento, float]:
-    """Más flujo norte–sur que este–oeste."""
     return {
         DireccionMovimiento.HACIA_SUR: 0.38,
         DireccionMovimiento.HACIA_NORTE: 0.38,
@@ -35,12 +28,6 @@ def _pesos_ns_dominante() -> Dict[DireccionMovimiento, float]:
 
 @dataclass(frozen=True)
 class PerfilGeneracion:
-    """
-    factor_intervalo multiplica `INTERVALO_SPAWN_BASE` (mayor = menos llegadas).
-    prob_intento es la probabilidad de crear un vehículo cuando toca un tick de spawn.
-    pesos_direccion: pesos no negativos para `random.choices` (no hace falta normalizar).
-    """
-
     nombre: str
     factor_intervalo: float
     prob_intento: float
@@ -50,7 +37,6 @@ class PerfilGeneracion:
         return max(0.35, float(config.INTERVALO_SPAWN_BASE) * self.factor_intervalo)
 
 
-# Plantilla de mixto en segundos (referencia 120 s); se escala a la duración real de la simulación.
 SEGMENTOS_MIXTO_REFERENCIA: List[Tuple[float, float, str]] = [
     (0.0, 40.0, "bajo"),
     (40.0, 80.0, "pico"),
@@ -87,9 +73,6 @@ def _normalizar_pesos(pesos: Dict[DireccionMovimiento, float]) -> Tuple[List[Dir
 
 
 class ControlGeneracionTrafico:
-    """
-    Aplica un perfil fijo o alterna perfiles en modo mixto según `tiempo_simulado`.
-    """
 
     def __init__(self, nombre_escenario: str, duracion_total: float) -> None:
         self.nombre_escenario = nombre_escenario
@@ -113,9 +96,6 @@ class ControlGeneracionTrafico:
         self._inicializado = False
 
     def sincronizar(self, tiempo_simulado: float, callback_cambio) -> PerfilGeneracion:
-        """
-        callback_cambio(nombre_anterior, nombre_nuevo, t) si cambia el tramo (mixto) o perfil.
-        """
         perfil = self._perfil_para_tiempo(tiempo_simulado)
         if not self._inicializado:
             self._inicializado = True
@@ -148,7 +128,6 @@ NOMBRES_ESCENARIOS_VALIDOS = ("bajo", "pico", "desbalanceado", "mixto")
 
 
 def crear_control_generacion(nombre: str, duracion_total: float) -> ControlGeneracionTrafico:
-    """Factoría usada por el motor de simulación."""
     clave = nombre.strip().lower()
     if clave not in NOMBRES_ESCENARIOS_VALIDOS:
         raise ValueError(f"Escenario no válido: {nombre}. Use: {NOMBRES_ESCENARIOS_VALIDOS}")

@@ -1,15 +1,3 @@
-"""
-Interfaz abstracta del motor de simulación y dos implementaciones:
-
-- `MotorSimulacionProgramatico`: sin gráficos, ideal para entrenar el GA o pruebas rápidas.
-- `MotorSimulacionPygame`: misma lógica con visualización 2D.
-
-Pygame se importa de forma perezosa solo al usar `MotorSimulacionPygame`, de modo que el GA
-y la simulación por consola funcionen aunque Pygame no esté instalado en el entorno.
-
-Un futuro adaptador SUMO implementaría la misma interfaz sin tocar difuso/genético/evaluación.
-"""
-
 from __future__ import annotations
 
 import math
@@ -44,7 +32,6 @@ def _import_pygame():
 
 
 class MotorSimulacion(ABC):
-    """Contrato que debe cumplir cualquier motor (local, Pygame, SUMO, etc.)."""
 
     @abstractmethod
     def obtener_estado_trafico(self) -> dict:
@@ -68,10 +55,6 @@ class MotorSimulacion(ABC):
 
 
 class MotorSimulacionProgramatico(MotorSimulacion):
-    """
-    Simulación basada en `Interseccion` sin renderizado.
-    Opcionalmente invoca un callback para fijar el verde con lógica difusa.
-    """
 
     def __init__(
         self,
@@ -106,11 +89,9 @@ class MotorSimulacionProgramatico(MotorSimulacion):
         self._etiqueta_control = etiqueta_control or ("Semaforo fijo" if modo_tiempo_fijo else "Control difuso")
         self._fuente_control = fuente_control or ("fijo" if modo_tiempo_fijo else "difuso")
         self._ultima_decision_verde: Dict[str, Any] | None = None
-        # Evita recalcular el verde varias veces dentro de la misma fase verde.
         self._fase_en_que_se_fijo_verde: FaseSemaforo | None = None
 
     def reiniciar(self, semilla: int | None = None) -> None:
-        """Reinicia el escenario; `semilla` controla la aleatoriedad del tráfico."""
         self.interseccion.reiniciar(semilla=semilla)
         self._fase_en_que_se_fijo_verde = None
         self._ultima_decision_verde = None
@@ -168,7 +149,6 @@ class MotorSimulacionProgramatico(MotorSimulacion):
         }
 
     def actualizar(self, dt: float) -> None:
-        """Avanza la intersección y ajusta el verde una sola vez al entrar en cada fase verde."""
         self.interseccion.actualizar(dt)
         sem = self.interseccion.semaforo
         if sem.fase not in (FaseSemaforo.VERDE_NS, FaseSemaforo.VERDE_EW):
@@ -195,7 +175,6 @@ class MotorSimulacionProgramatico(MotorSimulacion):
 
 
 class MotorSimulacionPygame(MotorSimulacionProgramatico):
-    """Motor con ventana Pygame; reutiliza la lógica del motor programático."""
 
     def __init__(
         self,
@@ -229,12 +208,10 @@ class MotorSimulacionPygame(MotorSimulacionProgramatico):
         self._reloj = self._pg.time.Clock()
         self._fuente_metricas = self._crear_fuente_metricas()
         self._fondo_cache: Any = self._cargar_fondo_opcional()
-        # Bases escaladas por tipo y variantes ya rotadas (clave: tipo, dirección efectiva).
         self._sprites_base_por_tipo: Dict[TipoVehiculo, Any] | None = None
         self._sprites_rotados_cache: Dict[Tuple[TipoVehiculo, DireccionMovimiento], Any] = {}
 
     def _cargar_fondo_opcional(self) -> Any:
-        """Si existe una imagen en assets/fondos, úsala; si no, fondo plano."""
         if not config.CARPETA_FONDOS.is_dir():
             return None
         candidatos = sorted(config.CARPETA_FONDOS.glob("*.png")) + sorted(
@@ -249,7 +226,6 @@ class MotorSimulacionPygame(MotorSimulacionProgramatico):
             return None
 
     def _crear_fuente_metricas(self) -> Any:
-        """Fuente tipo pixel / monoespaciada y negrita para el HUD; legible sobre fondos claros."""
         pg = self._pg
         px = int(getattr(config, "HUD_METRICAS_FUENTE_PX", 17))
         nombres = getattr(
@@ -264,7 +240,6 @@ class MotorSimulacionPygame(MotorSimulacionProgramatico):
         return pg.font.SysFont(["Courier New", "Courier", "Consolas"], px, bold=True)
 
     def _tamano_caja_sprite_px(self, radio: int) -> int:
-        """Encaja el arte en un cuadrado ~ proporcional al radio lógico del vehículo."""
         mult = float(getattr(config, "SPRITE_VEHICULO_MULT_RADIO", 4.35))
         lado_min = int(getattr(config, "SPRITE_VEHICULO_LADO_MIN", 34))
         return max(lado_min, int(round(mult * float(radio))))
@@ -291,7 +266,6 @@ class MotorSimulacionPygame(MotorSimulacionProgramatico):
             return None
 
     def _asegurar_sprites_base_por_tipo(self) -> None:
-        """Carga una vez `assets/carros/<tipo>.png` (o .jpg); si no hay por tipo, usa un único PNG genérico."""
         if self._sprites_base_por_tipo is not None:
             return
         self._sprites_base_por_tipo = {}
@@ -328,7 +302,6 @@ class MotorSimulacionPygame(MotorSimulacionProgramatico):
             self._sprites_base_por_tipo[tipo] = self._escalar_a_caja(surf_gen, lado)
 
     def _render_texto_metrica(self, texto: str, color: tuple, contorno: tuple, grosor: int) -> Any:
-        """Texto con contorno claro (8 vecinos) para leerlo sobre cualquier fondo."""
         pg = self._pg
         g = max(1, int(grosor))
         fg = self._fuente_metricas.render(texto, False, color)
@@ -351,7 +324,6 @@ class MotorSimulacionPygame(MotorSimulacionProgramatico):
         return out
 
     def _dibujar_hud_metricas(self, lineas: list[str]) -> None:
-        """Panel semitransparente + texto negro con contorno blanco."""
         pg = self._pg
         color_fg = tuple(getattr(config, "HUD_METRICAS_COLOR", (12, 12, 12)))
         contorno = tuple(getattr(config, "HUD_METRICAS_CONTORNO", (255, 255, 255)))
@@ -385,7 +357,6 @@ class MotorSimulacionPygame(MotorSimulacionProgramatico):
         self._pantalla.blit(panel, (x0, y0))
 
     def _angulo_sprite_grados(self, dx: float, dy: float) -> float:
-        """Asume el PNG con el morro hacia arriba (eje -Y pantalla); alinea con (dx, dy)."""
         return math.degrees(math.atan2(-dx, -dy))
 
     def _sprite_rotado(self, v: Vehiculo) -> Any | None:
@@ -479,7 +450,6 @@ class MotorSimulacionPygame(MotorSimulacionProgramatico):
             x = x_end + float(gap)
 
     def _dibujar_marcas_viales(self, cx: int, cy: int, ancho_calle: int) -> None:
-        """Paralelas (suaves) y eje fuera del cruce + marco blanco del cuadrado central."""
         pg = self._pg
         surf = self._pantalla
         color_eje = tuple(getattr(config, "COLOR_MARCA_VIAL", (248, 248, 252)))
@@ -504,7 +474,6 @@ class MotorSimulacionPygame(MotorSimulacionProgramatico):
             if x_hi < largo:
                 self._linea_horizontal_discontinua(yv, x_hi, largo - 1, col, g)
 
-        # Ejes (sentido opuesto) y carriles paralelos: tramos fuera del cuadro del cruce.
         v_doble(cx, 2, color_eje)
         v_doble(cx - mid, 1, color_par)
         v_doble(cx + mid, 1, color_par)
@@ -519,7 +488,6 @@ class MotorSimulacionPygame(MotorSimulacionProgramatico):
         self._pg.quit()
 
     def dibujar(self) -> None:
-        """Dibuja calles, semáforos y vehículos."""
         pg = self._pg
         if self._fondo_cache:
             self._pantalla.blit(self._fondo_cache, (0, 0))
@@ -585,7 +553,6 @@ class MotorSimulacionPygame(MotorSimulacionProgramatico):
         pg.display.flip()
 
     def _dibujar_semaforos(self, cx: int, cy: int) -> None:
-        """Indicadores simples en cada esquina."""
         pg = self._pg
         sem = self.interseccion.semaforo
 
@@ -619,7 +586,6 @@ class MotorSimulacionPygame(MotorSimulacionProgramatico):
         self,
         max_segundos: Optional[float] = None,
     ) -> None:
-        """Bucle estándar Pygame hasta cerrar ventana o alcanzar límite de tiempo."""
         pg = self._pg
         ejecutando = True
         tiempo_total = 0.0

@@ -5,12 +5,6 @@ from typing import List, Tuple
 
 
 def _consecuencia_regla(i_d: int, i_e: int, i_c: int) -> int:
-    """
-    Reglas compactas y defendibles:
-    - cola y espera pesan más que la densidad global,
-    - dos señales altas deben alargar el verde,
-    - tráfico realmente liviano debe producir verde corto.
-    """
     if i_c == 2 and i_e >= 1:
         return 2
     if i_e == 2 and i_d >= 1:

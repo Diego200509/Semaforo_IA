@@ -1,14 +1,3 @@
-"""
-Genera graficas de funciones de membresia del sistema difuso.
-
-Uso:
-    python scripts/graficar_membresias.py
-
-Salida:
-    - graficas/membresias_base.png
-    - graficas/membresias_final.png (si existe cromosoma_final.json)
-"""
-
 from __future__ import annotations
 
 import sys
@@ -18,11 +7,11 @@ from pathlib import Path
 RAIZ = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(RAIZ))
 
-import matplotlib.pyplot as plt  # noqa: E402
+import matplotlib.pyplot as plt
 
-import config  # noqa: E402
-from difuso.variables import aplicar_trimf, construir_universos, parametros_por_defecto  # noqa: E402
-from genetico.cromosoma import Cromosoma  # noqa: E402
+import config  
+from difuso.variables import aplicar_trimf, construir_universos, parametros_por_defecto  
+from genetico.cromosoma import Cromosoma  
 
 
 def _graficar_parametros(parametros, titulo: str, ruta_salida: Path) -> None:

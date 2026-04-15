@@ -1,7 +1,3 @@
-"""
-Representación de un vehículo: posición, tipo, maniobra, carril y métricas de espera (Fase 2).
-"""
-
 from __future__ import annotations
 
 from dataclasses import dataclass, field
@@ -12,7 +8,6 @@ from simulacion.tipos_trafico import TipoVehiculo, especificacion
 
 
 class DireccionMovimiento(Enum):
-    """Sentido aproximado respecto al centro de la intersección."""
 
     HACIA_SUR = auto()
     HACIA_NORTE = auto()
@@ -46,7 +41,6 @@ class Vehiculo:
     direccion: DireccionMovimiento
     tipo: TipoVehiculo = TipoVehiculo.AUTO
     maniobra: Maniobra = Maniobra.RECTO
-    # 0 = recto (carril exterior en ese sentido); 1 = giro (interior); al completar giro → 0 en el brazo de salida.
     carril: int = 0
     direccion_movimiento: DireccionMovimiento | None = None
     velocidad: float = 0.0
@@ -78,6 +72,5 @@ class Vehiculo:
         extra = float(getattr(config, "GAP_VISUAL_ENTRE_VEHICULOS", 0.0))
         base_px = float(getattr(config, "SEPARACION_BASE_CENTROS_PX", 4.0))
         base = base_px + ra + rb + extra
-        # Mayor despeje → un poco más de hueco (bus/camión).
         fd = max(self.factor_despeje(), otro.factor_despeje())
         return base * (0.82 + 0.12 * fd)

@@ -1,10 +1,3 @@
-"""
-Compara políticas de control con la misma duración y semilla(s).
-
-- `ejecutar_comparacion_promedios_multisemilla`: modo `comparar` (3 estrategias × N semillas).
-- `ejecutar_comparacion`: tres escenarios con una semilla (`comparar_completo`).
-- `metricas_promedio_por_escenario_y_estrategia`: datos para gráfica por escenario de tráfico.
-"""
 
 from __future__ import annotations
 
@@ -29,7 +22,6 @@ class ResultadoEscenario:
 
 @dataclass
 class ResultadoComparacionDifusoGA:
-    """Métricas finales de dos corridas: difuso sin entrenar vs difuso con cromosoma GA."""
 
     metricas_sin_ga: dict
     metricas_con_ga: Optional[dict]
@@ -39,7 +31,6 @@ class ResultadoComparacionDifusoGA:
 
 @dataclass
 class ResultadoPromedioEstrategia:
-    """Promedio de métricas sobre varias semillas para una misma política."""
 
     nombre: str
     metricas_promedio: dict
@@ -52,7 +43,6 @@ def _ruta_cromosoma_entrenado(perfil_entrenamiento: str | None = None):
 
 
 def promediar_metricas(metricas_list: List[dict]) -> dict:
-    """Promedia claves numéricas; ignora `segmentos_mixto`."""
     if not metricas_list:
         return {}
     claves = set()
@@ -134,12 +124,6 @@ def ejecutar_comparacion(
     escenario: str | None = None,
     perfil_entrenamiento: str | None = None,
 ) -> List[ResultadoEscenario]:
-    """
-    Comparación resumida para `comparar_completo`.
-
-    Si el llamador fuerza `semilla` o `escenario`, se conserva la corrida simple.
-    Si no, se usa un resumen más robusto: promedio en varias semillas y escenarios.
-    """
     duracion = duracion if duracion is not None else config.DURACION_ESCENARIO_COMPARACION
     dt = dt if dt is not None else config.DT_SIMULACION_RAPIDA
     corrida_simple = (semilla is not None) or (escenario is not None)
@@ -220,10 +204,6 @@ def ejecutar_comparacion_promedios_multisemilla(
     escenario: str | None = None,
     perfil_entrenamiento: str | None = None,
 ) -> List[ResultadoPromedioEstrategia]:
-    """
-    Para cada estrategia (fijo, difuso base, difuso+GA) ejecuta una corrida por semilla
-    y devuelve métricas y coste promediados.
-    """
     semillas = list(semillas if semillas is not None else config.SEEDS_COMPARACION_MULTISEMILLA)
     duracion = float(duracion if duracion is not None else config.DURACION_COMPARAR_DIFUSO_GA)
     dt = float(dt if dt is not None else config.DT_SIMULACION_RAPIDA)
@@ -284,11 +264,6 @@ def metricas_promedio_por_escenario_y_estrategia(
     dt: float | None = None,
     perfil_entrenamiento: str | None = None,
 ) -> Dict[str, Dict[str, dict]]:
-    """
-    Para cada escenario de tráfico y cada estrategia, métricas promediadas en `semillas`.
-    Claves de primer nivel: bajo, pico, desbalanceado, mixto.
-    Segundo nivel: Tiempo fijo, Difuso (base), Difuso + GA (si hay JSON).
-    """
     semillas = list(semillas if semillas is not None else config.SEEDS_COMPARACION_MULTISEMILLA)
     duracion = float(duracion if duracion is not None else config.DURACION_COMPARAR_DIFUSO_GA)
     dt = float(dt if dt is not None else config.DT_SIMULACION_RAPIDA)
@@ -328,7 +303,6 @@ def ejecutar_comparacion_difuso_vs_ga(
     escenario: str | None = None,
     perfil_entrenamiento: str | None = None,
 ) -> ResultadoComparacionDifusoGA:
-    """Dos corridas con la misma semilla (difuso base vs GA)."""
     semilla = semilla if semilla is not None else config.SEED_COMPARACION
     duracion = duracion if duracion is not None else config.DURACION_COMPARAR_DIFUSO_GA
     dt = dt if dt is not None else config.DT_SIMULACION_RAPIDA

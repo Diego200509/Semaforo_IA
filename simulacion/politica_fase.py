@@ -1,5 +1,3 @@
-"""Decision del siguiente grupo en verde (Fase 2)."""
-
 from __future__ import annotations
 
 from typing import Mapping

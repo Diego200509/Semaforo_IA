@@ -1,8 +1,3 @@
-"""
-Modelo de intersección: varios carriles, tipos de vehículo, fase adaptativa (Fase 2).
-Los giros se omiten si `config.VEHICULOS_SOLO_RECTO` es True.
-"""
-
 from __future__ import annotations
 
 import math
@@ -97,7 +92,6 @@ class Interseccion:
         self._seg_suma_cola = 0.0
         self._seg_muestras_cola = 0
         self._seg_atendidos = 0
-        # Snapshot usado por el difuso al arrancar un verde: conserva la cola previa al cambio.
         self._cola_snapshot_preverde_ns: float | None = None
         self._cola_snapshot_preverde_ew: float | None = None
 
@@ -228,7 +222,6 @@ class Interseccion:
         return v.direccion
 
     def _umbral_distancia_inicio_giro(self, v: Vehiculo) -> float:
-        """Mayor factor_despeje → comienza el giro antes (más radio de maniobra)."""
         return float(config.UMBRAL_INICIO_GIRO_CRUCE) * float(especificacion(v.tipo).factor_despeje)
 
     def _en_zona_cruce_interior(self, v: Vehiculo) -> bool:
@@ -347,7 +340,6 @@ class Interseccion:
         return math.hypot(v.x - self.centro_x, v.y - self.centro_y)
 
     def _progreso_en_linea(self, v: Vehiculo) -> float:
-        """Proyección sobre el sentido de marcha; crece hacia el cruce."""
         fx, fy = self._vector_direccion(v)
         return (v.x - self.centro_x) * fx + (v.y - self.centro_y) * fy
 
@@ -362,11 +354,9 @@ class Interseccion:
         return -1.0, 0.0
 
     def direccion_movimiento_efectiva(self, v: Vehiculo) -> DireccionMovimiento:
-        """Sentido de marcha efectivo (con giros solo si `VEHICULOS_SOLO_RECTO` es False)."""
         return self._direccion_movimiento_efectiva(v)
 
     def vector_movimiento_unitario(self, v: Vehiculo) -> Tuple[float, float]:
-        """Vector unitario (dx, dy) del movimiento efectivo, mismo criterio que la simulación."""
         return self._vector_direccion(v)
 
     def _direccion_para_guiado(self, v: Vehiculo) -> DireccionMovimiento:
@@ -412,10 +402,6 @@ class Interseccion:
             v.y += k * (ty - v.y)
 
     def _mismo_corredor_efectivo(self, a: Vehiculo, b: Vehiculo) -> bool:
-        """Misma marcha efectiva (SUR/NORTE/ESTE/OESTE) y misma banda lateral.
-
-        Eje lateral: X para flujos norte–sur, Y para flujos este–oeste (misma regla en los cuatro sentidos).
-        """
         if self._direccion_movimiento_efectiva(a) != self._direccion_movimiento_efectiva(b):
             return False
         tol = float(getattr(config, "TOLERANCIA_MISMO_CORREDOR_PX", 12.0))
@@ -425,7 +411,6 @@ class Interseccion:
         return abs(a.y - b.y) < tol
 
     def _vehiculo_delante_misma_aproximacion(self, v: Vehiculo) -> Vehiculo | None:
-        """Líder inmediato en el mismo corredor virtual (todos los sentidos y también en giro)."""
         pv = self._progreso_en_linea(v)
         candidatos: List[Vehiculo] = []
         for otro in self.vehiculos:
@@ -441,7 +426,6 @@ class Interseccion:
         return min(candidatos, key=lambda o: self._progreso_en_linea(o))
 
     def _aplicar_separacion_colas(self) -> None:
-        """Separa colas en todos los corredores (N-S y E-O): acerca al detrás hacia la distancia mínima."""
         beta = float(getattr(config, "SEPARACION_COLA_SUAVIDAD", 0.48))
         beta = max(0.15, min(1.0, beta))
         for _ in range(5):
@@ -469,7 +453,6 @@ class Interseccion:
                 self._clamp_a_cruz(v)
 
     def _refinar_separacion_longitudinal(self) -> None:
-        """Corrige solapes residuales en cola en cualquier sentido (empuje solo al de atrás, hacia el líder)."""
         cap = float(getattr(config, "SEPARACION_REFUERZO_LONG_MAX_PX", 5.5))
         for _ in range(4):
             activos = [v for v in self.vehiculos if not v.cruzo]
@@ -491,7 +474,6 @@ class Interseccion:
                 self._clamp_a_cruz(v)
 
     def _separar_solapes_en_cruce(self) -> None:
-        """Zona del cruce: separa solo pares de corredores distintos (cualquier cruce de trayectorias)."""
         r = float(config.RADIO_ZONA_CRUCE_INTERIOR) * 1.4
         activos = [v for v in self.vehiculos if not v.cruzo and self._distancia_al_centro(v) < r]
         for _ in range(4):
@@ -515,13 +497,9 @@ class Interseccion:
                     self._clamp_a_cruz(b)
 
     def _vehiculo_aporta_a_cola(self, v: Vehiculo) -> bool:
-        """La cola ya no depende del color: cuenta vehículos detenidos o casi detenidos."""
         return bool(v.detenido or v.velocidad < 15.0)
 
     def _proximo_verde_es_ns(self) -> bool | None:
-        """
-        Determina qué eje recibirá el siguiente verde usando el estado ya programado del semáforo.
-        """
         if self.semaforo.fase == FaseSemaforo.AMARILLO_NS:
             if self.semaforo.fase_adaptativa_activa and self.semaforo._siguiente_verde_ns is not None:
                 return bool(self.semaforo._siguiente_verde_ns)
@@ -533,9 +511,6 @@ class Interseccion:
         return None
 
     def _capturar_snapshot_cola_preverde(self) -> None:
-        """
-        Guarda la cola del eje que va a recibir verde justo antes del cambio de fase.
-        """
         proximo_ns = self._proximo_verde_es_ns()
         if proximo_ns is None:
             return
@@ -601,7 +576,6 @@ class Interseccion:
             )
         if self.semaforo.fase in (FaseSemaforo.AMARILLO_NS, FaseSemaforo.AMARILLO_EW):
             tiempo_restante = float(config.DURACION_AMARILLO) - float(self.semaforo.tiempo_en_fase)
-            # El snapshot conserva la cola previa al verde para que el difuso vea la demanda real.
             if tiempo_restante <= dt + 1e-9:
                 self._capturar_snapshot_cola_preverde()
 
@@ -628,7 +602,6 @@ class Interseccion:
                     self.vehiculos_atendidos_ns += 1
                 else:
                     self.vehiculos_atendidos_ew += 1
-                # Conserva la demora real por vehículo atendido para castigar esperas largas aisladas.
                 self.suma_demora_vehiculos_atendidos += float(v.tiempo_espera)
                 continue
 
@@ -664,7 +637,6 @@ class Interseccion:
                 else:
                     objetivo_vel = 0.0
 
-            # Tiempo de despeje: en el cruce, velocidad máxima acotada por tipo (bus/camión más lentos).
             if v.ingreso_cruce_autorizado and self._en_zona_cruce_interior(v):
                 cap = v.velocidad_libre_objetivo(config.VELOCIDAD_BASE) / max(0.5, v.factor_despeje())
                 objetivo_vel = min(objetivo_vel, cap)
@@ -680,7 +652,6 @@ class Interseccion:
             v.detenido = v.velocidad < 1.0
             v.actualizar_espera(dt)
 
-        # Cadena común para los cuatro brazos: cola suave → refuerzo longitudinal → cruces → refuerzo otra vez
         self._aplicar_separacion_colas()
         self._refinar_separacion_longitudinal()
         self._separar_solapes_en_cruce()
@@ -698,7 +669,6 @@ class Interseccion:
         self.suma_cola_ns_muestras += float(estado["cola_ns"])
         self.suma_cola_ew_muestras += float(estado["cola_ew"])
         self.muestras_ejes += 1
-        # La cola máxima complementa el promedio y ayuda a detectar picos de congestión.
         self.max_longitud_cola_observada = max(
             self.max_longitud_cola_observada,
             float(estado["longitud_cola"]),
@@ -761,7 +731,6 @@ class Interseccion:
             "longitud_cola": longitud_cola,
             "cola_ns": float(cola_ns),
             "cola_ew": float(cola_ew),
-            # Snapshot de demanda justo antes de entrar al verde; el callback difuso lo usa si existe.
             "cola_ns_preverde": (
                 float(self._cola_snapshot_preverde_ns)
                 if self._cola_snapshot_preverde_ns is not None

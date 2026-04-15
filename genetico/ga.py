@@ -149,7 +149,7 @@ def ejecutar_ga(
 
         for hijo1, hijo2 in zip(offspring[::2], offspring[1::2]):
             if random.random() < config.PROB_CRUCE:
-                toolbox.mate(hijo1, hijo2)
+                toolbox.mate(hijo1, hijo2) 
                 del hijo1.fitness.values
                 del hijo2.fitness.values
 
@@ -179,25 +179,3 @@ def ejecutar_ga(
         historial = [float(x) for x in todos_max[1:]]
     return mejor, historial
 
-
-def ejecutar_entrenamiento_banco(
-    semilla_base: int | None = None,
-    perfil_entrenamiento: str | None = None,
-):
-    from adaptacion.banco import BancoCromosomas, ETIQUETAS_VALIDAS, guardar_banco
-
-    semilla_base = semilla_base if semilla_base is not None else config.SEMILLA_ALEATORIA
-    perfil_cfg = config.obtener_perfil_entrenamiento(perfil_entrenamiento)
-    por: dict = {}
-    for i, esc in enumerate(ETIQUETAS_VALIDAS):
-        print(f"\n=== Entrenando escenario: {esc} ===")
-        mejor, _ = ejecutar_ga(
-            semilla_base=semilla_base + 10007 * i + 3,
-            escenario_fitness=esc,
-            multi_escenario=False,
-            perfil_entrenamiento=perfil_cfg.clave,
-        )
-        por[esc] = mejor
-    banco = BancoCromosomas(por_contexto=por)
-    guardar_banco(perfil_cfg.archivo_banco_cromosomas, banco)
-    return banco

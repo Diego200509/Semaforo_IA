@@ -1,9 +1,3 @@
-"""
-Utilidades para interpretar las metricas agregadas que expone el motor de simulacion.
-
-Mantiene el calculo de fitness en `genetico.fitness`; aqui solo formateo y derivados.
-"""
-
 from __future__ import annotations
 
 from typing import Mapping
@@ -12,10 +6,6 @@ import config
 
 
 def triple_metricas_presentacion(metricas: Mapping[str, float]) -> tuple[float, float, int]:
-    """
-    Extrae las tres magnitudes usadas en informes de comparacion GA:
-    espera promedio (muestras), cola promedio (muestras), vehiculos atendidos.
-    """
     esp = float(metricas.get("tiempo_espera_promedio_muestras", 0.0))
     cola = float(metricas.get("longitud_cola_promedio_muestras", 0.0))
     at = int(round(float(metricas.get("vehiculos_atendidos", 0.0))))
@@ -23,7 +13,6 @@ def triple_metricas_presentacion(metricas: Mapping[str, float]) -> tuple[float, 
 
 
 def resumen_legible(metricas: Mapping[str, float]) -> str:
-    """Texto compacto para consola o informes."""
     esp = float(metricas.get("tiempo_espera_promedio_muestras", 0.0))
     cola = float(metricas.get("longitud_cola_promedio_muestras", 0.0))
     at = int(round(float(metricas.get("vehiculos_atendidos", 0.0))))
@@ -46,7 +35,6 @@ def resumen_legible(metricas: Mapping[str, float]) -> str:
 
 
 def throughput(metricas: Mapping[str, float]) -> float:
-    """Vehiculos atendidos por unidad de tiempo (aprox. productividad del cruce)."""
     t = float(metricas.get("tiempo_simulado", 0.0))
     if t <= 1e-6:
         return 0.0
@@ -54,7 +42,6 @@ def throughput(metricas: Mapping[str, float]) -> float:
 
 
 def referencias_normalizacion() -> dict:
-    """Documenta escalas usadas en informes (utiles para defensa)."""
     return {
         "espera_max_referencia": config.ESPERA_MAX_UNIVERSO,
         "cola_max_referencia": config.COLA_MAX_UNIVERSO,

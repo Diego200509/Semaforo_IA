@@ -1,19 +1,9 @@
-"""
-Punto de entrada: coordina simulación, control difuso, algoritmo genético y evaluación.
-
-El flujo respeta la interfaz `MotorSimulacion` para que el núcleo inteligente no dependa
-de Pygame ni de un motor externo concreto.
-"""
-
 from __future__ import annotations
 
 import argparse
-from pathlib import Path
 from typing import Callable, Literal, Optional
 
 import config
-from adaptacion.banco import cargar_banco
-from adaptacion.callback_difuso import crear_callback_difuso_contextual
 from difuso.controlador import ControladorDifuso
 from difuso.variables import parametros_por_defecto
 from evaluacion.comparacion import ejecutar_comparacion, ejecutar_comparacion_promedios_multisemilla
@@ -22,7 +12,7 @@ from genetico.cromosoma import Cromosoma
 from simulacion.entorno import MotorSimulacionPygame, MotorSimulacionProgramatico
 from simulacion.escenarios import NOMBRES_ESCENARIOS_VALIDOS
 
-MensajeParametros = Literal["ga", "default", "banco"]
+MensajeParametros = Literal["ga", "default"]
 CallbackVerde = Callable[[dict], float]
 
 
@@ -32,24 +22,12 @@ def _resolver_callback_difuso(
     usar_default: bool,
     usar_ga: bool,
     mejor_cromosoma_legacy: bool,
-    adaptacion_banco: bool,
-    ruta_banco: Path | None,
     perfil_entrenamiento: str,
 ) -> tuple[Optional[CallbackVerde], MensajeParametros]:
     perfil_cfg = config.obtener_perfil_entrenamiento(perfil_entrenamiento)
     ruta = perfil_cfg.archivo_mejor_cromosoma
     existe = ruta.is_file()
     base = parametros_por_defecto()
-
-    if adaptacion_banco:
-        rb = ruta_banco or perfil_cfg.archivo_banco_cromosomas
-        if not rb.is_file():
-            parser.error(
-                f"No se encontró el banco de cromosomas en {rb}. "
-                "Genera uno con: python main.py --modo entrenar_banco"
-            )
-        banco = cargar_banco(rb)
-        return crear_callback_difuso_contextual(banco, base), "banco"
 
     if usar_default:
         return ControladorDifuso(base), "default"
@@ -72,8 +50,6 @@ def _resolver_callback_difuso(
 def _imprimir_aviso_parametros(msg: MensajeParametros) -> None:
     if msg == "ga":
         print("Usando parámetros optimizados del GA (un solo cromosoma)")
-    elif msg == "banco":
-        print("Usando banco de cromosomas con adaptación contextual (Fase 2)")
     else:
         print("Usando parámetros por defecto")
 
@@ -87,8 +63,6 @@ def _etiqueta_control_desde_flags(
         return "Semaforo fijo", "fijo"
     if msg == "ga":
         return "Logica difusa optimizada (GA)", "ga"
-    if msg == "banco":
-        return "Logica difusa contextual (banco)", "banco"
     return "Logica difusa (base)", "difuso_base"
 
 
@@ -106,8 +80,6 @@ def modo_simulacion_visual(
     tiempo_fijo: bool,
     escenario: str,
     verbose_escenario: bool,
-    adaptacion_banco: bool,
-    ruta_banco: Path | None,
     fase_adaptativa: bool,
     perfil_entrenamiento: str,
 ) -> None:
@@ -120,8 +92,6 @@ def modo_simulacion_visual(
             usar_default=usar_default,
             usar_ga=usar_ga,
             mejor_cromosoma_legacy=mejor_cromosoma_legacy,
-            adaptacion_banco=adaptacion_banco,
-            ruta_banco=ruta_banco,
             perfil_entrenamiento=perfil_entrenamiento,
         )
         _imprimir_aviso_parametros(msg)
@@ -155,7 +125,7 @@ def modo_simulacion_visual(
         if fase_adaptativa:
             print("Fase semafórica: adaptativa (prioridad por colas / esperas).")
         else:
-            print("Fase semafórica: ciclo fijo NS ↔ EW.")
+            print("Fase semaforica: ciclo fijo NS <-> EW.")
     motor.ejecutar_bucle_visual(max_segundos=None)
 
 
@@ -168,8 +138,6 @@ def modo_simulacion_programatica(
     tiempo_fijo: bool,
     escenario: str,
     verbose_escenario: bool,
-    adaptacion_banco: bool,
-    ruta_banco: Path | None,
     fase_adaptativa: bool,
     perfil_entrenamiento: str,
 ) -> None:
@@ -182,8 +150,6 @@ def modo_simulacion_programatica(
             usar_default=usar_default,
             usar_ga=usar_ga,
             mejor_cromosoma_legacy=mejor_cromosoma_legacy,
-            adaptacion_banco=adaptacion_banco,
-            ruta_banco=ruta_banco,
             perfil_entrenamiento=perfil_entrenamiento,
         )
         _imprimir_aviso_parametros(msg)
@@ -228,7 +194,6 @@ def modo_simulacion_programatica(
 
 def modo_entrenar(perfil_entrenamiento: str) -> None:
     from evaluacion.graficas import graficar_evolucion_fitness
-    # Import perezoso: sim_visual y sim_prog no deben depender de DEAP.
     from genetico.ga import ejecutar_ga
 
     perfil_cfg = config.obtener_perfil_entrenamiento(perfil_entrenamiento)
@@ -250,22 +215,7 @@ def modo_entrenar(perfil_entrenamiento: str) -> None:
     )
     print(f"Gráfica de evolución: {perfil_cfg.archivo_grafica_evolucion}")
 
-
-def modo_entrenar_banco(perfil_entrenamiento: str) -> None:
-    # Import perezoso: el banco solo se necesita al entrenar, no al abrir la simulación.
-    from genetico.ga import ejecutar_entrenamiento_banco
-
-    perfil_cfg = config.obtener_perfil_entrenamiento(perfil_entrenamiento)
-    print(f"Entrenando banco de cromosomas [{perfil_cfg.etiqueta_ui}] (4 GA secuenciales; puede tardar mucho)...")
-    ejecutar_entrenamiento_banco(
-        semilla_base=config.SEMILLA_ALEATORIA,
-        perfil_entrenamiento=perfil_cfg.clave,
-    )
-    print(f"Banco guardado en: {perfil_cfg.archivo_banco_cromosomas}")
-
-
 def modo_comparar(duracion: float, escenario: str, perfil_entrenamiento: str) -> None:
-    """Promedios multisemilla (3 estrategias) + gráfica por escenario de tráfico."""
     from evaluacion.comparacion import metricas_promedio_por_escenario_y_estrategia
     from evaluacion.graficas import (
         graficar_comparacion_por_escenario,
@@ -353,14 +303,12 @@ def main(argv: list[str] | None = None) -> int:
             "sim_visual",
             "sim_prog",
             "entrenar",
-            "entrenar_banco",
             "comparar",
             "comparar_completo",
         ],
         default="sim_visual",
         help=(
             "sim_visual / sim_prog: simulación; entrenar: GA (multi-escenario si config); "
-            "entrenar_banco: Fase 2, un cromosoma por contexto; "
             "comparar / comparar_completo: evaluación."
         ),
     )
@@ -397,20 +345,9 @@ def main(argv: list[str] | None = None) -> int:
         help="Desactiva el difuso y usa tiempos fijos de config (línea base).",
     )
     parser.add_argument(
-        "--adaptacion-banco",
-        action="store_true",
-        help="Fase 2: usa banco_cromosomas.json y elige cromosoma según contexto de tráfico.",
-    )
-    parser.add_argument(
-        "--banco-cromosomas",
-        type=Path,
-        default=None,
-        help="Ruta al JSON del banco (por defecto: banco_cromosomas.json en la raíz del proyecto).",
-    )
-    parser.add_argument(
         "--no-fase-adaptativa",
         action="store_true",
-        help="Fase 2: ciclo NS↔EW fijo en lugar de prioridad por colas.",
+        help="Usa ciclo NS<->EW fijo en lugar de prioridad por colas.",
     )
     parser.add_argument(
         "--segundos",
@@ -435,9 +372,6 @@ def main(argv: list[str] | None = None) -> int:
     esc = args.escenario.strip().lower()
     verbose_mix = args.verbose_escenario or (esc == "mixto")
 
-    if args.tiempo_fijo and args.adaptacion_banco:
-        parser.error("--adaptacion-banco no es compatible con --tiempo-fijo.")
-
     fase_adaptativa = (not args.no_fase_adaptativa) and (not args.tiempo_fijo)
 
     if args.modo == "sim_visual":
@@ -449,8 +383,6 @@ def main(argv: list[str] | None = None) -> int:
             tiempo_fijo=args.tiempo_fijo,
             escenario=esc,
             verbose_escenario=verbose_mix,
-            adaptacion_banco=args.adaptacion_banco,
-            ruta_banco=args.banco_cromosomas,
             fase_adaptativa=fase_adaptativa,
             perfil_entrenamiento=args.perfil_entrenamiento,
         )
@@ -464,15 +396,11 @@ def main(argv: list[str] | None = None) -> int:
             tiempo_fijo=args.tiempo_fijo,
             escenario=esc,
             verbose_escenario=verbose_mix,
-            adaptacion_banco=args.adaptacion_banco,
-            ruta_banco=args.banco_cromosomas,
             fase_adaptativa=fase_adaptativa,
             perfil_entrenamiento=args.perfil_entrenamiento,
         )
     elif args.modo == "entrenar":
         modo_entrenar(args.perfil_entrenamiento)
-    elif args.modo == "entrenar_banco":
-        modo_entrenar_banco(args.perfil_entrenamiento)
     elif args.modo == "comparar":
         modo_comparar(seg_comparar, esc, args.perfil_entrenamiento)
     elif args.modo == "comparar_completo":
